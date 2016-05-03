@@ -8,7 +8,22 @@ import (
 	"path/filepath"
 )
 
-func getImageSet(pattern string) []CIFAR10Image {
+type ImageSet []CIFAR10Image
+
+func (c ImageSet) Shape(index int) int {
+	return len(c)
+}
+
+func (c ImageSet) Reshape(newshape, size int) []byte {
+	result := make([]byte, 0)
+	for _, img := range c {
+		result = append(result, img.data...)
+	}
+
+	return result
+}
+
+func loadCIFAR10(pattern string) (ImageSet, []byte) {
 	var set = make([]CIFAR10Image, 0)
 	trainingFiles, err := filepath.Glob(pattern)
 	if err != nil {
@@ -17,7 +32,7 @@ func getImageSet(pattern string) []CIFAR10Image {
 	}
 	for _, dataFile := range trainingFiles {
 		images, err := imagesFromFile(dataFile)
-		log.Printf("importing training data from %s\n", dataFile)
+		log.Printf("importing data from %s\n", dataFile)
 		if err != nil {
 			if err != io.EOF {
 				log.Printf("error during import %s", err)
@@ -25,11 +40,17 @@ func getImageSet(pattern string) []CIFAR10Image {
 		}
 		set = append(set, images...)
 	}
-	return set
+
+	labels := make([]byte, 0)
+	for _, img := range set {
+		labels = append(labels, img.label)
+	}
+
+	return set, labels
 }
 
-func imagesFromFile(filename string) ([]CIFAR10Image, error) {
-	var images = make([]CIFAR10Image, 0)
+func imagesFromFile(filename string) (ImageSet, error) {
+	var images = make(ImageSet, 0)
 	f, err := os.Open(filename)
 	if err != nil {
 		return images, err
