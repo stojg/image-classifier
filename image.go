@@ -7,8 +7,9 @@ import (
 )
 
 type CIFAR10Image struct {
-	label byte
+	label dLabel
 	data  []byte
+	raw   []dValue
 }
 
 func (i *CIFAR10Image) Decode() (image.Image, error) {
@@ -30,23 +31,25 @@ func (i *CIFAR10Image) Decode() (image.Image, error) {
 	return img, nil
 }
 
+
+func (i *CIFAR10Image) Write(b []byte) (n int, err error) {
+	i.label = dLabel(b[0])
+	i.raw = make([]dValue, len(b)-1)
+	for idx, val := range b[1:] {
+		i.raw[idx] = dValue(val)
+	}
+	return len(b), nil
+}
+
 func toPNG(i CIFAR10Image, location string) error {
 	var out *os.File
 	var err error
 	if out, err = os.Create(location); err != nil {
 		return err
 	}
-
 	img, _ := i.Decode()
 	if err := png.Encode(out, img); err != nil {
 		return err
 	}
 	return nil
-}
-
-func (i *CIFAR10Image) Write(b []byte) (n int, err error) {
-	i.label = b[0]
-	i.data = make([]byte, len(b)-1)
-	copied := copy(i.data, b[1:])
-	return copied, nil
 }

@@ -14,16 +14,15 @@ func (c ImageSet) Shape(index int) int {
 	return len(c)
 }
 
-func (c ImageSet) Reshape(newshape, size int) []byte {
-	result := make([]byte, 0)
+func (c ImageSet) RawData() []dValue {
+	result := make([]dValue, 0)
 	for _, img := range c {
-		result = append(result, img.data...)
+		result = append(result, img.raw...)
 	}
-
 	return result
 }
 
-func loadCIFAR10(pattern string) (ImageSet, []byte) {
+func loadCIFAR10(pattern string) (ImageSet, []dLabel) {
 	var set = make([]CIFAR10Image, 0)
 	trainingFiles, err := filepath.Glob(pattern)
 	if err != nil {
@@ -41,7 +40,7 @@ func loadCIFAR10(pattern string) (ImageSet, []byte) {
 		set = append(set, images...)
 	}
 
-	labels := make([]byte, 0)
+	labels := make([]dLabel, 0)
 	for _, img := range set {
 		labels = append(labels, img.label)
 	}
@@ -56,6 +55,7 @@ func imagesFromFile(filename string) (ImageSet, error) {
 		return images, err
 	}
 	defer f.Close()
+
 	for {
 		data := make([]byte, 1+1024*3)
 		if _, err := f.Read(data); err != nil {

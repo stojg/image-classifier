@@ -6,51 +6,59 @@ import (
 	"math"
 )
 
+type dValue int64
+type dLabel byte
+
 type NearestNeighbour struct {
-	data   []CIFAR10Image
-	labels []byte
+	data   []dValue
+	labels []dLabel
 }
 
-func (c *NearestNeighbour) Train(X []CIFAR10Image, y []byte) {
+func (c *NearestNeighbour) Train(X []dValue, y []dLabel) {
 	c.data = X
 	c.labels = y
 }
 
-func AbsSub(a, b []byte) int {
-	var result int
-	for k := range a {
-		diff := int(a[k]) - int(b[k])
-		if diff < 0 {
-			diff = -diff
-		}
-		result += diff
-	}
-	return result
-}
+func (c *NearestNeighbour) Predict(testSet []dValue) []dLabel {
 
-func (c *NearestNeighbour) Predict(testSet []CIFAR10Image) []byte {
-	num_test := len(testSet)
-	prediction := make([]byte, num_test)
-	for i := range testSet {
+	stride := 1024 * 3
+	numTests := len(testSet) / stride
+	numTraining := len(c.data) / stride
+
+	prediction := make([]dLabel, numTests)
+	for i := 0; i < numTests; i++ {
+		// distances = np.sum(np.abs(self.Xtr - X[i,:]), axis = 1)
+		testData := testSet[i*stride : i*stride+stride]
 		lowestScore := math.MaxInt32
-		for j := range c.data {
-			result := AbsSub(c.data[j].data, testSet[i].data)
+		for j := 0; j < numTraining; j++ {
+			result := AbsSub(testData, c.data[j*stride:j*stride+stride])
 			if result < lowestScore {
 				lowestScore = result
-				prediction[i] = c.data[j].label
+				prediction[i] = c.labels[j]
 			}
 		}
-		if i > 20 {
-			return prediction
-		}
+		// min_index = np.argmin(distances) # get the index with smallest distance
+		// Ypred[i] = self.ytr[min_index] # predict the label of the nearest example
 		fmt.Printf(".")
 	}
 	return prediction
-	return c.labels[:10000]
+}
+
+func AbsSub(a, b []dValue) int {
+	var result dValue
+	for k := range a {
+		diff := dValue(a[k]) - dValue(b[k])
+		if diff < 0 {
+			diff = -diff
+			//fmt.Printf("low %d - %d res: %d\n", a[k], b[k], diff)
+		}
+		result += (diff)
+	}
+	return int(result)
 }
 
 // compares two slices with the compare func
-func mean(xS, yS []byte, compareFunc func(x, y byte) bool) float32 {
+func mean(xS, yS []dLabel, compareFunc func(x, y dLabel) bool) float32 {
 	count := 0
 	for i := range xS {
 		if compareFunc(xS[i], yS[i]) {
@@ -63,19 +71,24 @@ func mean(xS, yS []byte, compareFunc func(x, y byte) bool) float32 {
 func main() {
 	trainingSet, trainingLabels := loadCIFAR10("data/data_batch_*")
 	testSet, testLabels := loadCIFAR10("data/test_batch.bin")
+
+	xTraining := trainingSet.RawData()
+	xTest := testSet.RawData()
+
 	nn := &NearestNeighbour{}
-	nn.Train(trainingSet, trainingLabels)
-	Yte_predict := nn.Predict(testSet)
-	avg := mean(Yte_predict, testLabels, func(x, y byte) bool {
+	nn.Train(xTraining, trainingLabels)
+	Yte_predict := nn.Predict(xTest)
+
+	avg := mean(Yte_predict, testLabels, func(x, y dLabel) bool {
 		return x == y
 	})
 	log.Printf("accuracy: %f", avg)
 }
 
 type Trainer interface {
-	Train(trainingImages []byte, labels []byte)
+	Train(trainingImages []dValue, labels []dValue)
 }
 
 type Predictor interface {
-	Predict(testData []byte) (testLabels []byte)
+	Predict(testData []dValue) (testLabels []dValue)
 }
