@@ -31,7 +31,6 @@ func (i *CIFAR10Image) Decode() (image.Image, error) {
 	return img, nil
 }
 
-
 func (i *CIFAR10Image) Write(b []byte) (n int, err error) {
 	i.label = dLabel(b[0])
 	i.raw = make([]dValue, len(b)-1)
