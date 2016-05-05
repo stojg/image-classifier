@@ -7,9 +7,9 @@ import (
 )
 
 type CIFAR10Image struct {
-	label dLabel
+	label float64
 	data  []byte
-	raw   []dValue
+	raw   []float64
 }
 
 func (i *CIFAR10Image) Decode() (image.Image, error) {
@@ -32,10 +32,10 @@ func (i *CIFAR10Image) Decode() (image.Image, error) {
 }
 
 func (i *CIFAR10Image) Write(b []byte) (n int, err error) {
-	i.label = dLabel(b[0])
-	i.raw = make([]dValue, len(b)-1)
+	i.label = float64(b[0])
+	i.raw = make([]float64, len(b)-1)
 	for idx, val := range b[1:] {
-		i.raw[idx] = dValue(val)
+		i.raw[idx] = float64(val)
 	}
 	return len(b), nil
 }

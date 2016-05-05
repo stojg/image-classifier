@@ -2,45 +2,32 @@ package main
 
 import (
 	"log"
+	"os"
 )
 
-type dValue int64
-type dLabel byte
-
-// compares two slices with the compare func
-func mean(xS, yS []dLabel, compareFunc func(x, y dLabel) bool) float32 {
-	count := 0
-	for i := range xS {
-		if compareFunc(xS[i], yS[i]) {
-			count++
-		}
-	}
-	return float32(count) / float32(len(xS))
-}
-
 func main() {
-	trainingSet, trainingLabels := loadCIFAR10("data/data_batch_*")
-	testSet, testLabels := loadCIFAR10("data/test_batch.bin")
+	cTraining, _ := loadCIFAR10("data/data_batch_*")
+	cTest, cTestLabels := loadCIFAR10("data/test_batch.bin")
+
+	if len(cTraining) < 1 || len(cTest) < 1 {
+		log.Printf("No training or test data found")
+		os.Exit(1)
+	}
+
 	log.Printf("Converting image data for classifier")
-	xTraining := trainingSet.RawData()
-	xTest := testSet.RawData()
+	trainingData := cTraining.asTrainingSet()
+	testData := cTest.asTestSet()
 
-	nn := &NearestNeighbour{}
+	nn := &NearestNeighbour{log: true}
+
 	log.Printf("Training classifier")
-	nn.Train(xTraining, trainingLabels)
-	log.Printf("Predicting")
-	Yte_predict := nn.Predict(xTest)
+	nn.Train(trainingData)
 
-	avg := mean(Yte_predict, testLabels, func(x, y dLabel) bool {
+	log.Printf("Predicting")
+	predictions := nn.Predict(testData)
+
+	avg := labelCompare(predictions, cTestLabels, func(x, y float64) bool {
 		return x == y
 	})
 	log.Printf("accuracy: %f", avg)
-}
-
-type Trainer interface {
-	Train(trainingImages []dValue, labels []dValue)
-}
-
-type Predictor interface {
-	Predict(testData []dValue) (testLabels []dValue)
 }

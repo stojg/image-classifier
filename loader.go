@@ -10,19 +10,30 @@ import (
 
 type ImageSet []CIFAR10Image
 
-func (c ImageSet) Shape(index int) int {
-	return len(c)
-}
+func (c ImageSet) asTrainingSet() [][][]float64 {
+	data := make([][][]float64, len(c))
+	for i := 0; i < len(c); i++ {
+		data[i] = make([][]float64, 2)
 
-func (c ImageSet) RawData() []dValue {
-	result := make([]dValue, 0)
-	for _, img := range c {
-		result = append(result, img.raw...)
+		data[i][0] = make([]float64, len(c[i].raw))
+		copy(data[i][0], c[i].raw)
+
+		data[i][1] = make([]float64, 1)
+		data[i][1][0] = float64(c[i].label)
 	}
-	return result
+	return data
 }
 
-func loadCIFAR10(pattern string) (ImageSet, []dLabel) {
+func (c ImageSet) asTestSet() [][]float64 {
+	data := make([][]float64, len(c))
+	for i := 0; i < len(c); i++ {
+		data[i] = make([]float64, len(c[i].raw))
+		copy(data[i], c[i].raw)
+	}
+	return data
+}
+
+func loadCIFAR10(pattern string) (ImageSet, []float64) {
 	var set = make([]CIFAR10Image, 0)
 	trainingFiles, err := filepath.Glob(pattern)
 	if err != nil {
@@ -40,9 +51,9 @@ func loadCIFAR10(pattern string) (ImageSet, []dLabel) {
 		set = append(set, images...)
 	}
 
-	labels := make([]dLabel, 0)
+	var labels []float64
 	for _, img := range set {
-		labels = append(labels, img.label)
+		labels = append(labels, float64(img.label))
 	}
 
 	return set, labels
@@ -65,5 +76,4 @@ func imagesFromFile(filename string) (ImageSet, error) {
 		io.Copy(&image, bytes.NewReader(data))
 		images = append(images, image)
 	}
-	return images, nil
 }

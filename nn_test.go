@@ -1,48 +1,63 @@
 package main
 
 import (
+	"github.com/gonum/matrix/mat64"
 	"math/rand"
 	"testing"
 )
 
-func getRandomData() ([]dValue, []dLabel) {
+func getRandomData(n int, size int) [][][]float64 {
 	r := rand.New(rand.NewSource(99))
 
-	testData := make([]dValue, 1024*3)
-	for i := 0; i < 1024*3; i++ {
-		testData[i] = dValue(r.Intn(255))
+	trainingData := make([][][]float64, n)
+	for i := 0; i < n; i++ {
+		trainingData[i] = make([][]float64, 2)
+		trainingData[i][0] = make([]float64, size)
+		for j := 0; j < size; j++ {
+			trainingData[i][0][j] = float64(r.Intn(255))
+		}
+		trainingData[i][1] = make([]float64, 1)
+		trainingData[i][1][0] = float64(r.Intn(255))
 	}
-
-	testLabels := make([]dLabel, 1)
-	for i := 0; i < 1; i++ {
-		testLabels[i] = dLabel(r.Intn(100))
-	}
-	return testData, testLabels
+	return trainingData
 }
 
-func TestNeareastNeighbour(t *testing.T) {
+func TestNearestNeighbour(t *testing.T) {
 
-	testData, testLabels := getRandomData()
+	trainingData := getRandomData(2, 32)
+
+	var testData [][]float64
+	for idx := range trainingData {
+		testData = append(testData, trainingData[idx][0])
+	}
 
 	n := &NearestNeighbour{}
-	n.Train(testData, testLabels)
+	n.Train(trainingData)
 	prediction := n.Predict(testData)
 
-	if !(len(prediction) == 1 && prediction[0] == testLabels[0]) {
+	t.Logf("%v", testData)
+	if prediction.At(0, 0) != trainingData[0][1][0] {
 		t.Errorf("Expected the nn classifier to find exact match with same training and test data")
 	}
 
+	if prediction.At(1, 0) != trainingData[1][1][0] {
+		t.Errorf("Expected the nn classifier to find exact match with same training and test data")
+	}
 }
 
-var result []dLabel
+var result *mat64.Dense
 
-func BenchmarkXxx(b *testing.B) {
-	testData, testLabels := getRandomData()
+func BenchmarkNearestNeighbour(b *testing.B) {
 
+	trainingData := getRandomData(1, 1024*3)
+	var testData [][]float64
+	for idx := range trainingData {
+		testData = append(testData, trainingData[idx][0])
+	}
 	n := &NearestNeighbour{}
-	n.Train(testData, testLabels)
+	n.Train(trainingData)
+	var r *mat64.Dense
 
-	var r []dLabel
 	for i := 0; i < b.N; i++ {
 		r = n.Predict(testData)
 	}
