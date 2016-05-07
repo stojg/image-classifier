@@ -6,12 +6,14 @@ import (
 	"os"
 )
 
+// CIFAR10Image represent a singular image from the CIFAR10Image set
 type CIFAR10Image struct {
 	label float64
 	data  []byte
 	raw   []float64
 }
 
+// Decode will return a image.Image that can be converted to a png or what not
 func (i *CIFAR10Image) Decode() (image.Image, error) {
 
 	img := image.NewRGBA(image.Rectangle{
@@ -27,7 +29,6 @@ func (i *CIFAR10Image) Decode() (image.Image, error) {
 			img.Pix[j*4+channel] = i.data[j+channel*1024]
 		}
 	}
-
 	return img, nil
 }
 

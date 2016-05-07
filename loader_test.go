@@ -9,7 +9,7 @@ import (
 func TestAsFloat64Slice(t *testing.T) {
 
 	set := ImageSet{}
-	preparedData := set.asTrainingSet()
+	preparedData := set.asMatrix()
 
 	if len(preparedData) != 0 {
 		t.Errorf("data should be empty from empty list")
@@ -19,7 +19,7 @@ func TestAsFloat64Slice(t *testing.T) {
 	io.Copy(&image, bytes.NewReader([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9}))
 	set = append(set, image)
 
-	preparedData = set.asTrainingSet()
+	preparedData = set.asMatrix()
 	if len(preparedData) != 1 {
 		t.Errorf("data should have 1 row of data, have %d", len(preparedData))
 	}
@@ -32,14 +32,14 @@ func TestAsFloat64Slice(t *testing.T) {
 		t.Errorf("Expected data[0][0] to have 8 data points, got %d ", len(preparedData[0][0]))
 	}
 
-	if len(preparedData[0][1]) != 1 {
-		t.Errorf("Expected data[0][1] to have 1 class, got %d ", len(preparedData[0][1]))
+	if len(preparedData[0][1]) != 10 {
+		t.Errorf("Expected data[0][1] to have 10 classes, got %d ", len(preparedData[0][1]))
 	}
 
 	image2 := CIFAR10Image{}
 	io.Copy(&image2, bytes.NewReader([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9}))
 	set = append(set, image2)
-	preparedData = set.asTrainingSet()
+	preparedData = set.asMatrix()
 
 	if len(preparedData) != 2 {
 		t.Errorf("data should have 2 rows of data, have %d", len(preparedData))

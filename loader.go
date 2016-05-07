@@ -8,27 +8,17 @@ import (
 	"path/filepath"
 )
 
+// ImageSet is an collection of CIFAR10Images
 type ImageSet []CIFAR10Image
 
-func (c ImageSet) asTrainingSet() [][][]float64 {
+func (c ImageSet) asMatrix() [][][]float64 {
 	data := make([][][]float64, len(c))
 	for i := 0; i < len(c); i++ {
 		data[i] = make([][]float64, 2)
-
 		data[i][0] = make([]float64, len(c[i].raw))
 		copy(data[i][0], c[i].raw)
-
-		data[i][1] = make([]float64, 1)
-		data[i][1][0] = float64(c[i].label)
-	}
-	return data
-}
-
-func (c ImageSet) asTestSet() [][]float64 {
-	data := make([][]float64, len(c))
-	for i := 0; i < len(c); i++ {
-		data[i] = make([]float64, len(c[i].raw))
-		copy(data[i], c[i].raw)
+		data[i][1] = make([]float64, 10)
+		data[i][1][int(c[i].label)] = 1.0
 	}
 	return data
 }

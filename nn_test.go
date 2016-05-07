@@ -1,14 +1,12 @@
 package main
 
 import (
-	"github.com/gonum/matrix/mat64"
 	"math/rand"
 	"testing"
 )
 
 func getRandomData(n int, size int) [][][]float64 {
 	r := rand.New(rand.NewSource(99))
-
 	trainingData := make([][][]float64, n)
 	for i := 0; i < n; i++ {
 		trainingData[i] = make([][]float64, 2)
@@ -33,19 +31,18 @@ func TestNearestNeighbour(t *testing.T) {
 
 	n := &NearestNeighbour{}
 	n.Train(trainingData)
-	prediction := n.Predict(testData)
+	prediction := n.Predict(testData[0])
 
-	t.Logf("%v", testData)
-	if prediction.At(0, 0) != trainingData[0][1][0] {
-		t.Errorf("Expected the nn classifier to find exact match with same training and test data")
+	if prediction[0] != trainingData[0][1][0] {
+		t.Errorf("1st Expected the nn classifier to find exact match with same training and test data")
 	}
-
-	if prediction.At(1, 0) != trainingData[1][1][0] {
-		t.Errorf("Expected the nn classifier to find exact match with same training and test data")
+	prediction = n.Predict(testData[1])
+	if prediction[0] != trainingData[1][1][0] {
+		t.Errorf("2nd Expected the nn classifier to find exact match with same training and test data")
 	}
 }
 
-var result *mat64.Dense
+var result []float64
 
 func BenchmarkNearestNeighbour(b *testing.B) {
 
@@ -56,10 +53,10 @@ func BenchmarkNearestNeighbour(b *testing.B) {
 	}
 	n := &NearestNeighbour{}
 	n.Train(trainingData)
-	var r *mat64.Dense
+	var r []float64
 
 	for i := 0; i < b.N; i++ {
-		r = n.Predict(testData)
+		r = n.Predict(testData[0])
 	}
 	result = r
 }
