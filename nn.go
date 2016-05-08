@@ -7,7 +7,6 @@ import (
 // NearestNeighbour predicts a by using the k nearest neighbour with k = 1
 type NearestNeighbour struct {
 	data [][][]float64
-	log  bool
 }
 
 // Train trains the predictor
@@ -18,9 +17,10 @@ func (nn *NearestNeighbour) Train(x [][][]float64) {
 // Predict nearest neighbour
 func (nn *NearestNeighbour) Predict(input []float64) []float64 {
 
+	// calculate the difference between all data
 	scores := make([]float64, len(nn.data))
 	for j := 0; j < len(nn.data); j++ {
-		scores[j] = nn.L1(input, nn.data[j][0])
+		scores[j] = nn.L2(input, nn.data[j][0])
 	}
 
 	k := 1

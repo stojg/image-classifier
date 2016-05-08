@@ -73,7 +73,7 @@ func TestNormalising(t *testing.T) {
 		}
 		for j := range actual[i] {
 			if actual[i][j] != expected[i][j] {
-				t.Errorf("Wanted expected[%d][%d] %f, got actual[%d][%d] %f", i, j, expected[i][j], actual[i][j])
+				t.Errorf("Wanted expected[%d][%d] %f, got actual[%d][%d] %f", i, j, expected[i][j], i, j, actual[i][j])
 			}
 		}
 	}
