@@ -16,20 +16,27 @@ func main() {
 		log.Printf("No training or test data found")
 		os.Exit(1)
 	}
+	log.Printf("training set full size %d", len(trainingData))
 
-	trainingData = trainingData[:1000]
-	testData = trainingData[1000:1100]
+	x := trainingData[:40000]
+	y := trainingData[40000:]
 
-	log.Printf("training set size %d", len(trainingData))
-	log.Printf("test set size %d", len(testData))
+	//n := &Normaliser{}
+	//patterns := make([]byte, len(trainingData[0]))
+	//n.Normalise(trainingData, patterns)
+
+	log.Printf("training set size %d", len(x))
+	log.Printf("veridication set size %d", len(y))
 
 	nn := &NearestNeighbour{log: true}
 	log.Printf("Training Nearest neighbour")
-	nn.Train(trainingData)
+	nn.Train(x)
 	log.Printf("Predicting on Nearest neighbour")
 
+	every := 10
+
 	var correctPredictions float64
-	for _, p := range testData {
+	for i, p := range y {
 		result := nn.Predict(p[0])
 		expected := p[1]
 		matches := 0
@@ -41,6 +48,10 @@ func main() {
 		if matches == len(expected) {
 			correctPredictions++
 		}
+		if i%every == 0 {
+			log.Printf("%d/%d done, acc: %.0f%% %.0f/%d", i, len(y), correctPredictions/float64(i)*100, correctPredictions, i)
+		}
+
 	}
 
 	log.Printf("Nearest Neighbour accuracy: %0.1f%% (%.0f/%d)\n", correctPredictions/float64(len(testData))*100, correctPredictions, len(testData))
