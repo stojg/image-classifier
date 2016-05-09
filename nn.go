@@ -11,6 +11,8 @@ type NearestNeighbour struct {
 
 // Train trains the predictor
 func (nn *NearestNeighbour) Train(x [][][]float64) {
+
+	// convert into matrix
 	nn.data = x
 }
 
@@ -19,6 +21,7 @@ func (nn *NearestNeighbour) Predict(input []float64) []float64 {
 
 	// calculate the difference between all data
 	scores := make([]float64, len(nn.data))
+
 	for j := 0; j < len(nn.data); j++ {
 		scores[j] = nn.L2(input, nn.data[j][0])
 	}
