@@ -6,21 +6,18 @@ import (
 
 // NearestNeighbour predicts a by using the k nearest neighbour with k = 1
 type NearestNeighbour struct {
-	data     [][][]float64
+	labels   [][]float64
 	training []*Matrix
 }
 
 // Train trains the predictor
 func (nn *NearestNeighbour) Train(x [][][]float64) {
-
-	// convert into matrix
-
-	nn.training = make([]*Matrix, 0)
+	nn.training = make([]*Matrix, len(x))
+	nn.labels =make([][]float64, len(x))
 	for i := range x {
-		nn.training = append(nn.training, NewMatrixF(x[i][0], 1, len(x[i][0])))
+		nn.training[i] = NewMatrixF(x[i][0], 1, len(x[i][0]))
+		nn.labels[i] = x[i][1]
 	}
-
-	nn.data = x
 }
 
 // Predict nearest neighbour
@@ -28,7 +25,8 @@ func (nn *NearestNeighbour) Predict(input []float64) []float64 {
 
 	testData := NewMatrixF(input, 1, len(input))
 
-	scores := make([]float64, len(nn.data))
+	scores := make([]float64, len(nn.labels))
+
 
 	for i, val := range nn.training {
 		scores[i] = val.Sub(testData).AbsSum()
@@ -48,14 +46,13 @@ func (nn *NearestNeighbour) Predict(input []float64) []float64 {
 			}
 		}
 
-		closest := make([]float64, len(nn.data[lowestIndex][1]))
-		copy(closest, nn.data[lowestIndex][1])
-		neighbours = append(neighbours, closest)
+		neighbours = append(neighbours, nn.labels[lowestIndex])
 		// we don't have enough test images to fill out all neighbours
 		// @todo return error and the list so far
 		if len(scores) < 2 {
 			break
 		}
+		// delete this entry from the scores
 		scores[n] = scores[len(scores)-1]
 		scores = scores[:len(scores)-1]
 	}
