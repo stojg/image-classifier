@@ -6,24 +6,32 @@ import (
 
 // NearestNeighbour predicts a by using the k nearest neighbour with k = 1
 type NearestNeighbour struct {
-	data [][][]float64
+	data     [][][]float64
+	training []*Matrix
 }
 
 // Train trains the predictor
 func (nn *NearestNeighbour) Train(x [][][]float64) {
 
 	// convert into matrix
+
+	nn.training = make([]*Matrix, 0)
+	for i := range x {
+		nn.training = append(nn.training, NewMatrixF(x[i][0], 1, len(x[i][0])))
+	}
+
 	nn.data = x
 }
 
 // Predict nearest neighbour
 func (nn *NearestNeighbour) Predict(input []float64) []float64 {
 
-	// calculate the difference between all data
+	testData := NewMatrixF(input, 1, len(input))
+
 	scores := make([]float64, len(nn.data))
 
-	for j := 0; j < len(nn.data); j++ {
-		scores[j] = nn.L2(input, nn.data[j][0])
+	for i, val := range nn.training {
+		scores[i] = val.Sub(testData).AbsSum()
 	}
 
 	k := 1

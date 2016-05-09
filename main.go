@@ -19,8 +19,8 @@ func main() {
 	}
 	log.Printf("training set full size %d", len(trainingData))
 
-	x := trainingData[:40000]
-	y := trainingData[40000:]
+	x := trainingData[:2000]
+	y := trainingData[2000:2100]
 
 	//n := &Normaliser{}
 	//patterns := make([]byte, len(trainingData[0]))
@@ -42,10 +42,10 @@ func main() {
 			correctPredictions++
 		}
 		if i%10 == 0 {
-			log.Printf("accuracy: %.0f%% (%d / %d) out of %d tests", percent(correctPredictions, i+1), correctPredictions, i+1, len(y))
+			log.Printf("accuracy: %.0f%% (%d / %d)", percent(correctPredictions, i+1), correctPredictions, i+1)
 		}
 	}
-	log.Printf("Nearest Neighbour accuracy: %0.1f%% (%d / %d)\n", percent(correctPredictions, len(testData)), correctPredictions, len(testData))
+	log.Printf("Nearest Neighbour accuracy: %0.1f%% (%d / %d)", percent(correctPredictions, len(y)), correctPredictions, len(y))
 
 }
 

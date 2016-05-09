@@ -18,7 +18,6 @@ func TestNewMatrix(t *testing.T) {
 	if rows != 3 && cols != 4 {
 		t.Errorf("expected correct dims")
 	}
-
 }
 
 func TestNewVector(t *testing.T) {
@@ -28,7 +27,42 @@ func TestNewVector(t *testing.T) {
 	if rows != 4 {
 		t.Errorf("expected correct dims")
 	}
+}
 
+func TestMatrixAt(t *testing.T) {
+	m := NewMatrix([][]float64{
+		[]float64{0, 1},
+		[]float64{2, 3},
+	})
+
+	if m.At(0, 0) != 0 {
+		t.Errorf("fail when trying to get 0, got %.1f", m.At(0, 0))
+	}
+	if m.At(0, 1) != 1 {
+		t.Errorf("fail when trying to get 1, got %.1f", m.At(0, 1))
+	}
+	if m.At(1, 0) != 2 {
+		t.Errorf("fail when trying to get 2, got %.1f", m.At(1, 0))
+	}
+	if m.At(1, 1) != 3 {
+		t.Errorf("fail when trying to get 3, got %.1f", m.At(1, 1))
+	}
+}
+
+func TestMatrixMax(t *testing.T) {
+	A := NewMatrixF([]float64{0, 1, 2, 3, 4, 5, 4, 3, 2, 1}, 5, 2)
+
+	if A.Max() != 5 {
+		t.Errorf("could not find max in Matrix, got %f", A.Max())
+	}
+}
+
+func TestMatrixMin(t *testing.T) {
+	A := NewMatrixF([]float64{5, 4, 3, 2, 1, 0, -4, 3, 1, 56}, 5, 2)
+
+	if A.Min() != -4 {
+		t.Errorf("could not find max in Matrix, got %f", A.Min())
+	}
 }
 
 func TestMatrixMulVector(t *testing.T) {
@@ -147,6 +181,59 @@ func TestMatrixAdd(t *testing.T) {
 		t.Errorf("actual is not the same as expected")
 		actual.Print()
 		expected.Print()
+	}
+}
+
+func TestMatrixSub(t *testing.T) {
+	A := NewMatrix([][]float64{
+		[]float64{1, 2, 3},
+		[]float64{4, 5, 6},
+	})
+
+	B := NewMatrix([][]float64{
+		[]float64{1, 2, 3},
+		[]float64{4, 5, 6},
+	})
+
+	expected := NewMatrix([][]float64{
+		[]float64{0, 0, 0},
+		[]float64{0, 0, 0},
+	})
+	actual := A.Sub(B)
+	if !actual.Equals(expected) {
+		t.Errorf("actual is not the same as expected")
+		actual.Print()
+		expected.Print()
+	}
+}
+
+func TestMatrixSum(t *testing.T) {
+	A := NewMatrix([][]float64{
+		[]float64{1, 2, 3},
+		[]float64{4, 5, 6},
+	})
+	expected := 21.0
+
+	if A.Sum() != expected {
+		t.Errorf("expected %f, got %f", expected, A.Sum())
+	}
+
+}
+
+func TestSubScalar(t *testing.T) {
+	A := NewMatrix([][]float64{
+		[]float64{1, 2, 3},
+		[]float64{4, 5, 6},
+	})
+
+	expected := NewMatrix([][]float64{
+		[]float64{-4, -3, -2},
+		[]float64{-1, 0, 1},
+	})
+
+	if !A.ScalarSub(5).Equals(expected) {
+		t.Errorf("Matrix.SubScalar() failed")
+		A.ScalarSub(5).Print()
 	}
 
 }
