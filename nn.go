@@ -13,7 +13,7 @@ type NearestNeighbour struct {
 // Train trains the predictor
 func (nn *NearestNeighbour) Train(x [][][]float64) {
 	nn.training = make([]*Matrix, len(x))
-	nn.labels =make([][]float64, len(x))
+	nn.labels = make([][]float64, len(x))
 	for i := range x {
 		nn.training[i] = NewMatrixF(x[i][0], 1, len(x[i][0]))
 		nn.labels[i] = x[i][1]
@@ -26,7 +26,6 @@ func (nn *NearestNeighbour) Predict(input []float64) []float64 {
 	testData := NewMatrixF(input, 1, len(input))
 
 	scores := make([]float64, len(nn.labels))
-
 
 	for i, val := range nn.training {
 		scores[i] = val.Sub(testData).AbsSum()

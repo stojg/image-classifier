@@ -2,6 +2,7 @@ package main
 
 import (
 	"math"
+	//"fmt"
 )
 
 const (
@@ -28,24 +29,26 @@ func (n *Normaliser) Transpose(input [][]float64) [][]float64 {
 
 func (n *Normaliser) Normalise(input [][]float64, patterns []byte) [][]float64 {
 
-	if len(input[0]) != len(patterns) {
-		panic("input must have the same width as the patterns")
-	}
+	//if len(input[0]) != len(patterns) {
+	//	panic("input must have the same width as the patterns")
+	//}
 
 	br := n.Transpose(input)
+
 	var resultX [][]float64
 	for i := range br {
-		switch patterns[i] {
-		case NormNumeric:
-			resultX = append(resultX, n.numeric(br[i]))
-		case NormCategory:
-			cats := n.categorise(br[i])
-			for _, cat := range cats {
-				resultX = append(resultX, cat)
-			}
-		default:
-			resultX = append(resultX, br[i])
-		}
+		resultX = append(resultX, n.numeric(br[i]))
+		//switch patterns[i] {
+		//case NormNumeric:
+		//	resultX = append(resultX, n.numeric(br[i]))
+		//case NormCategory:
+		//	cats := n.categorise(br[i])
+		//	for _, cat := range cats {
+		//		resultX = append(resultX, cat)
+		//	}
+		//default:
+		//	resultX = append(resultX, br[i])
+		//}
 	}
 	return n.Transpose(resultX)
 }
@@ -68,8 +71,13 @@ func (n *Normaliser) categorise(rows []float64) [][]float64 {
 
 func (n *Normaliser) numeric(values []float64) []float64 {
 	var result []float64
+
 	mean := n.sum(values) / float64(len(values))
+
 	stdDev := n.stdDev(values, mean)
+	//fmt.Println(values)
+	//fmt.Println(mean)
+
 	for k := range values {
 		result = append(result, (values[k]-mean)/stdDev)
 	}
@@ -84,11 +92,16 @@ func (n *Normaliser) sum(numbers []float64) (total float64) {
 }
 
 func (n *Normaliser) stdDev(numbers []float64, mean float64) float64 {
+	if len(numbers) == 1 {
+		return 1.0
+	}
 	total := 0.0
 	for _, number := range numbers {
 		total += math.Pow(number-mean, 2)
 	}
-	variance := total / float64(len(numbers)-1)
+	var variance float64
+	variance = total / float64(len(numbers)-1)
+
 	return math.Sqrt(variance)
 }
 

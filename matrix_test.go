@@ -134,7 +134,7 @@ func TestMatrixMul(t *testing.T) {
 		A := NewMatrix(test[0])
 		B := NewMatrix(test[1])
 		expected := NewMatrix(test[2])
-		actual := A.Mul(B)
+		actual := A.Dot(B)
 		if !actual.Equals(expected) {
 			t.Errorf("actual is not the same as expected")
 			actual.Print()
@@ -156,7 +156,7 @@ func BenchmarkMatrixMul(b *testing.B) {
 	})
 	var actual *Matrix
 	for i := 0; i < b.N; i++ {
-		actual = A.Mul(B)
+		actual = A.Dot(B)
 	}
 	bResult = actual
 }
@@ -235,7 +235,48 @@ func TestSubScalar(t *testing.T) {
 		t.Errorf("Matrix.SubScalar() failed")
 		A.ScalarSub(5).Print()
 	}
+}
 
+func TestMatrixTranspose(t *testing.T) {
+	A := NewMatrix([][]float64{
+		[]float64{1, 2},
+		[]float64{3, 4},
+		[]float64{5, 6},
+	})
+
+	expected := NewMatrix([][]float64{
+		[]float64{1, 3, 5},
+		[]float64{2, 4, 6},
+	})
+
+	actual := A.Transpose()
+
+	if !actual.Equals(expected) {
+		t.Errorf("not correct")
+		A.Print()
+		actual.Print()
+	}
+}
+
+func TestMatrixColDiv(t *testing.T) {
+	A := NewMatrix([][]float64{
+		[]float64{3, 6, 9},
+		[]float64{10, 8, 16},
+	})
+	B := NewMatrix([][]float64{
+		[]float64{3},
+		[]float64{2},
+	})
+
+	expected := NewMatrix([][]float64{
+		[]float64{1, 2, 3},
+		[]float64{5, 4, 8},
+	})
+
+	actual := A.ColDiv(B)
+	if !actual.Equals(expected) {
+		t.Errorf("not the expected")
+	}
 }
 
 func BenchmarkMatrixAdd(b *testing.B) {
