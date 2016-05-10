@@ -19,8 +19,8 @@ func (c ImageSet) asMatrix() [][][]float64 {
 		data[i] = make([][]float64, 2)
 		data[i][0] = make([]float64, len(c[i].raw))
 		copy(data[i][0], c[i].raw)
-		data[i][1] = make([]float64, 10)
-		data[i][1][int(c[i].label)] = 1.0
+		data[i][1] = make([]float64, 1)
+		copy(data[i][1], []float64{c[i].label})
 	}
 	return data
 }
