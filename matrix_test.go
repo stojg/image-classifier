@@ -258,6 +258,26 @@ func TestMatrixTranspose(t *testing.T) {
 	}
 }
 
+func TestArgMax(t *testing.T) {
+	A := NewMatrix([][]float64{
+		[]float64{3, 9, 6},
+		[]float64{10, 8, 16},
+		[]float64{9, 8, 6},
+	})
+
+	expected := []int{1, 2, 0}
+
+	if A.ArgMax()[0] != expected[0] {
+		t.Errorf("Argmax fail #1")
+	}
+	if A.ArgMax()[1] != expected[1] {
+		t.Errorf("Argmax fail #2")
+	}
+	if A.ArgMax()[2] != expected[2] {
+		t.Errorf("Argmax fail #3")
+	}
+}
+
 func TestMatrixColDiv(t *testing.T) {
 	A := NewMatrix([][]float64{
 		[]float64{3, 6, 9},

@@ -13,19 +13,21 @@ import (
 // ImageSet is an collection of CIFAR10Images
 type ImageSet []CIFAR10Image
 
-func (c ImageSet) asMatrix() [][][]float64 {
-	data := make([][][]float64, len(c))
+func (c ImageSet) asFloatSlices() ([][]float64, [][]byte) {
+	x := make([][]float64, len(c))
+	y := make([][]byte, len(c))
 	for i := 0; i < len(c); i++ {
-		data[i] = make([][]float64, 2)
-		data[i][0] = make([]float64, len(c[i].raw))
-		copy(data[i][0], c[i].raw)
-		data[i][1] = make([]float64, 1)
-		copy(data[i][1], []float64{c[i].label})
+		x[i] = make([]float64, len(c[i].raw))
+		copy(x[i], c[i].raw)
+		y[i] = make([]byte, 10)
+		if c[i].label == 0 {
+		}
+		y[i][c[i].label] = 1.0
 	}
-	return data
+	return x, y
 }
 
-func loadCIFAR10(pattern string) (ImageSet, []float64) {
+func loadCIFAR10(pattern string) (ImageSet, []byte) {
 	var set = make([]CIFAR10Image, 0)
 	trainingFiles, err := filepath.Glob(pattern)
 	if err != nil {
@@ -44,9 +46,9 @@ func loadCIFAR10(pattern string) (ImageSet, []float64) {
 		set = append(set, images...)
 	}
 
-	var labels []float64
+	var labels []byte
 	for _, img := range set {
-		labels = append(labels, float64(img.label))
+		labels = append(labels, (img.label))
 	}
 
 	return set, labels
@@ -73,7 +75,7 @@ func imagesFromFile(filename string) (ImageSet, error) {
 
 // CIFAR10Image represent a singular image from the CIFAR10Image set
 type CIFAR10Image struct {
-	label float64
+	label byte
 	data  []byte
 	raw   []float64
 }
@@ -98,7 +100,7 @@ func (i *CIFAR10Image) Decode() (image.Image, error) {
 }
 
 func (i *CIFAR10Image) Write(b []byte) (n int, err error) {
-	i.label = float64(b[0])
+	i.label = (b[0])
 	i.raw = make([]float64, len(b)-1)
 	for idx, val := range b[1:] {
 		i.raw[idx] = float64(val)

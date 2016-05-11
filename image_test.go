@@ -12,8 +12,8 @@ func TestLoading(t *testing.T) {
 	data := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	io.Copy(&image, bytes.NewReader(data))
 
-	if image.label != float64(data[0]) {
-		t.Errorf("Expected label to be %d, got %.0f", data[0], image.label)
+	if image.label != byte(data[0]) {
+		t.Errorf("Expected label to be %d, got %d", data[0], image.label)
 	}
 
 	if image.raw[0] != float64(data[1]) {
@@ -31,9 +31,9 @@ func TestLoading(t *testing.T) {
 func TestAsFloat64Slice(t *testing.T) {
 
 	set := ImageSet{}
-	preparedData := set.asMatrix()
+	x, y := set.asFloatSlices()
 
-	if len(preparedData) != 0 {
+	if len(x) != 0 {
 		t.Errorf("data should be empty from empty list")
 	}
 
@@ -41,30 +41,26 @@ func TestAsFloat64Slice(t *testing.T) {
 	io.Copy(&image, bytes.NewReader([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9}))
 	set = append(set, image)
 
-	preparedData = set.asMatrix()
-	if len(preparedData) != 1 {
-		t.Errorf("data should have 1 row of data, have %d", len(preparedData))
+	x, y = set.asFloatSlices()
+	if len(x) != 1 {
+		t.Errorf("data should have 1 row of data, have %d", len(x))
 	}
 
-	if len(preparedData[0]) != 2 {
-		t.Errorf("Expected data[0] to have only have data and labels, got %d cols", len(preparedData[0]))
+	if len(x[0]) != 8 {
+		t.Errorf("Expected x to have 8 data points, got %d ", len(x[0]))
 	}
 
-	if len(preparedData[0][0]) != 8 {
-		t.Errorf("Expected data[0][0] to have 8 data points, got %d ", len(preparedData[0][0]))
-	}
-
-	if len(preparedData[0][1]) != 10 {
-		t.Errorf("Expected data[0][1] to have 10 classes, got %d ", len(preparedData[0][1]))
+	if len(y[0]) != 10 {
+		t.Errorf("Expected y to have 10 classes, got %d ", len(y[0]))
 	}
 
 	image2 := CIFAR10Image{}
 	io.Copy(&image2, bytes.NewReader([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9}))
 	set = append(set, image2)
-	preparedData = set.asMatrix()
+	x, y = set.asFloatSlices()
 
-	if len(preparedData) != 2 {
-		t.Errorf("data should have 2 rows of data, have %d", len(preparedData))
+	if len(x) != 2 {
+		t.Errorf("data should have 2 rows of data, have %d", len(x))
 	}
 
 }

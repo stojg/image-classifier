@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"math/rand"
 	"time"
 )
@@ -9,101 +9,135 @@ import (
 type trail struct {
 	labels [][]float64
 	bestW  *Matrix
-	bestb  *Matrix
+	bestB  *Matrix
+	bestW2 *Matrix
+	bestB2 *Matrix
+	log    bool
 }
 
-func (t *trail) Train(input [][][]float64) {
+func (t *trail) Train(inputX [][]float64, y [][]byte, numEpocs int) {
+
+	const (
+		reg      = 1e-3
+		stepSize = 0.01
+	)
 
 	rand.Seed(time.Now().UTC().UnixNano())
+
 	dataX := make([]float64, 0)
-
-	for i := range input {
-		dataX = append(dataX, input[i][0]...)
+	for i := range inputX {
+		dataX = append(dataX, inputX[i]...)
 	}
+	x := NewMatrixF(dataX, len(inputX), len(inputX[0]))
 
-	dataY := make([]float64, 0)
-	for i := range input {
-		dataY = append(dataY, input[i][1][0])
-	}
-
-	D := len(input[0][0]) // dim
-	K := 10               // number of classes
-
-	x := NewMatrixF(dataX, len(input), len(input[0][0]))
-	y := NewMatrixF(dataY, len(input), 1)
+	inputNeurons := len(inputX[0])
+	hiddenNeurons := 100
+	outputNeurons := len(y[0]) // number of classes
 
 	// initialize parameters randomly
-	W := NewRandomMatrix(D, K).ScalarMul(0.1)
-	b := NewZerosMatrix(1, K)
+	W := NewRandomMatrix(inputNeurons, hiddenNeurons).ScalarMul(0.01)
+	b := NewZerosMatrix(1, hiddenNeurons)
 
-	const reg = 1e-3
-	const stepSize = 0.001
+	W2 := NewRandomMatrix(hiddenNeurons, outputNeurons).ScalarMul(0.01)
+	b2 := NewZerosMatrix(1, outputNeurons)
 
-	var scores *Matrix
+	var hScore *Matrix
 
-	for i := 0; i < 1000; i++ {
+	for epoch := 0; epoch < numEpocs; epoch++ {
 
-		// evaluate class scores,
-		scores = x.Dot(W).RowAdd(b)
+		// evaluate class scores with a 2-layer Neural Network
+		hLayer := x.Dot(W).RowAdd(b).ElementMax(0) // Rectified linear unit (ReLU) activation
+		hScore = hLayer.Dot(W2).RowAdd(b2)
 
-		if i%1 == 0 {
-			fmt.Printf("%d: ", i)
-			t.score(scores, W, y, reg)
+		if t.log && epoch%1 == 0 {
+			loss := t.loss(hScore, W, W2, y, reg)
+			log.Printf("epoch %d: loss: %f, accuracy %.1f%%", epoch+1, loss, t.accuracy(hScore, y)*100)
+
 		}
 
-		// Computing the Analytic Gradient with Back propagation
-		dscores := scores.Clone()
-		row := 0
-		for _, val := range y.AsIntSlice() {
-			dscores.data[row*dscores.cols+val] = dscores.data[row*dscores.cols+val] - 1
-			row++
+		// dScores will contain the gradient of the scores
+		dScores := hScore.Clone()
+		for row := range y {
+			for col := range y[row] {
+				if y[row][col] > 0 {
+					dScores.data[row*dScores.cols+col] -= 1
+					break
+				}
+			}
 		}
-		dscores = dscores.ScalarDiv(float64(x.rows))
+		dScores = dScores.ScalarDiv(float64(x.rows))
 
-		// back propagate into W and b
-		dW := x.Transpose().Dot(dscores)
-		// sum all the bias differences
-		db := dscores.ColSum()
+		// back propagate the gradient to the parameters
+		// 1) back propagate into parameters W2 and b2 (output)
+		dW2 := hLayer.Transpose().Dot(dScores)
+		db2 := dScores.ColSum()
+		// 2) next backprop into hidden layer
+		dHidden := dScores.Dot(W2.Transpose())
+		// backprop the ReLU non-linearity
+		for i := range dHidden.data {
+			if hLayer.data[i] < 0 {
+				dHidden.data[i] = 0
+			}
+		}
+
+		// finally into W,b (input)
+		dW := x.Transpose().Dot(dHidden)
+		db := dHidden.ColSum()
+
+		// add regularization gradient contribution
+		dW2 = dW2.Add(W2.ScalarMul(reg))
 		dW = dW.Add(W.ScalarMul(reg))
 
 		// parameter update
 		W = W.Add(dW.ScalarMul(-stepSize))
 		b = b.Add(db.ScalarMul(-stepSize))
+		W2 = W2.Add(dW2.ScalarMul(-stepSize))
+		b2 = b2.Add(db2.ScalarMul(-stepSize))
 	}
-
-	t.score(scores, W, y, reg)
-
+	t.bestW2 = W2
+	t.bestB2 = b2
 	t.bestW = W
-	t.bestb = b
+	t.bestB = b
+
+	if t.log {
+		loss := t.loss(hScore, W, W2, y, reg)
+		log.Printf("result: loss: %f, accuracy %.1f%%", loss, t.accuracy(hScore, y)*100)
+	}
 }
 
 func (t *trail) Predict(input []float64) []int {
 	xTe := NewMatrixF(input, 1, len(input))
-	scores := xTe.Dot(t.bestW).RowAdd(t.bestb)
+
+	// evaluate class scores with a 2-layer Neural Network
+	hiddenLayer := xTe.Dot(t.bestW).RowAdd(t.bestB).ElementMax(0) // ReLU activation
+	scores := hiddenLayer.Dot(t.bestW2).RowAdd(t.bestB2)
+
 	return scores.ArgMax()
 }
 
-func (t *trail) score(scores *Matrix, W *Matrix, y *Matrix, reg float64) {
-	scoresExp := scores.ScalarExp()
+func (t *trail) loss(scores, W, W2 *Matrix, y [][]byte, reg float64) float64 {
+	// get unnormalized probabilities
+	scoresExp := scores.Clone().ScalarExp()
+	// normalize them for each example
 	probs := scoresExp.ColDiv(scoresExp.RowSum())
-	correctLogProbs := probs.RowFinder(y.AsIntSlice()).ScalarMinusLog()
+	// We can now query for the log probabilities assigned to the correct classes in each example:
+	correctLogProbs := probs.RowFinder(y).ScalarMinusLog()
 
 	// compute the loss: average cross-entropy loss and regularization
-	data_loss := correctLogProbs.Sum() / float64(y.rows)
-	reg_loss := 0.5 * reg * W.ElementMul(W).Sum()
+	data_loss := correctLogProbs.Sum() / float64(len(y))
+	reg_loss := 0.5*reg*W.ElementMul(W).Sum() + 0.5*reg*W2.ElementMul(W2).Sum()
 	loss := data_loss + reg_loss
 
-	fmt.Printf("loss: %.2f ", loss)
-	fmt.Printf("accuracy: %.2f\n", comp(y.AsIntSlice(), scores.ArgMax()))
+	return loss
 }
 
-func comp(a, b []int) float64 {
+func (t *trail) accuracy(scores *Matrix, y [][]byte) float64 {
+	actual := scores.ArgMax()
 	correct := 0.0
-	for i, val := range a {
-		if b[i] == val {
+	for i := range actual {
+		if y[i][actual[i]] > 0 {
 			correct += 1
 		}
 	}
-	return correct / float64(len(a))
-
+	return correct / float64(len(y))
 }

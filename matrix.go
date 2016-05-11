@@ -263,6 +263,14 @@ func (A *Matrix) Max() float64 {
 	return max
 }
 
+func (A *Matrix) ElementMax(max float64) *Matrix {
+	res := make([]float64, len(A.data))
+	for i := range A.data {
+		res[i] = math.Max(max, A.data[i])
+	}
+	return NewMatrixF(res, A.rows, A.cols)
+}
+
 func (A *Matrix) Min() float64 {
 	max := math.Inf(1)
 	for _, val := range A.data {
@@ -289,13 +297,20 @@ func (A *Matrix) ElementMul(B *Matrix) *Matrix {
 	return NewMatrixF(res, A.rows, A.cols)
 }
 
-func (A *Matrix) RowFinder(y []int) *Matrix {
+func (A *Matrix) RowFinder(y [][]byte) *Matrix {
+
 	rows := len(y)
-	data := make([]float64, rows)
-	for t := 0; t < rows; t++ {
-		data[t] = A.At(t, y[t])
+	result := make([]float64, rows)
+	for row := range y {
+		for col, val := range y[row] {
+			if val > 0 {
+				result[row] = A.At(row, col)
+				continue
+			} else {
+			}
+		}
 	}
-	return NewMatrixF(data, rows, 1)
+	return NewMatrixF(result, rows, 1)
 }
 
 func (A *Matrix) AsIntSlice() []int {
@@ -347,7 +362,9 @@ func (A *Matrix) ScalarMinusLog() *Matrix {
 }
 
 func (A *Matrix) Clone() *Matrix {
-	return NewMatrixF(A.data, A.rows, A.cols)
+	clonedData := make([]float64, len(A.data))
+	copy(clonedData, A.data)
+	return NewMatrixF(clonedData, A.rows, A.cols)
 }
 
 func (A *Matrix) AbsSum() float64 {
