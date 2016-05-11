@@ -55,12 +55,14 @@ func (t *trail) Train(inputX [][]float64, y [][]byte, numEpocs int) {
 
 		}
 
-		// dScores will contain the gradient of the scores
 		dScores := hScore.Clone()
 		for row := range y {
 			for col := range y[row] {
 				if y[row][col] > 0 {
-					dScores.data[row*dScores.cols+col] -= 1
+					// by decreasing the correct class probability with one
+					// we find the descent in the direction where the
+					// loss function is decreasing the most
+					dScores.data[row*dScores.cols+col] -= 1 //
 					break
 				}
 			}
@@ -71,9 +73,9 @@ func (t *trail) Train(inputX [][]float64, y [][]byte, numEpocs int) {
 		// 1) back propagate into parameters W2 and b2 (output)
 		dW2 := hLayer.Transpose().Dot(dScores)
 		db2 := dScores.ColSum()
-		// 2) next backprop into hidden layer
+		// 2) next back propagate into hidden layer
 		dHidden := dScores.Dot(W2.Transpose())
-		// backprop the ReLU non-linearity
+		// back propagate the ReLU non-linearity
 		for i := range dHidden.data {
 			if hLayer.data[i] < 0 {
 				dHidden.data[i] = 0
