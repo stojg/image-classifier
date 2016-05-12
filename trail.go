@@ -16,11 +16,13 @@ type NeuralNet struct {
 	log    bool
 }
 
-func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs int) {
+func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte) {
 
 	const (
 		reg      = 1e-3
-		stepSize = 0.03
+		stepSize = 1
+		numEpochs = 10
+		numHidden = 20
 	)
 
 	predictionLength := int(math.Floor(float64(len(xIn)) / float64(10)))
@@ -36,7 +38,7 @@ func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs int) {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	inputNeurons := len(xIn[0])
-	hiddenNeurons := 150
+	hiddenNeurons := numHidden
 	outputNeurons := numClasses // number of classes
 
 	if t.log {
