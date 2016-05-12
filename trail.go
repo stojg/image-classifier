@@ -2,11 +2,12 @@ package main
 
 import (
 	"log"
+	"math"
 	"math/rand"
 	"time"
 )
 
-type trail struct {
+type NeuralNet struct {
 	labels [][]float64
 	bestW  *Matrix
 	bestB  *Matrix
@@ -15,24 +16,32 @@ type trail struct {
 	log    bool
 }
 
-func (t *trail) Train(inputX [][]float64, y [][]byte, numEpocs int) {
+func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs int) {
 
 	const (
 		reg      = 1e-3
-		stepSize = 0.01
+		stepSize = 0.03
 	)
+
+	predictionLength := int(math.Floor(float64(len(xIn)) / float64(10)))
+
+	x := t.makeMatrix(xIn[:len(xIn)-predictionLength])
+	y := yIn[:len(xIn)-predictionLength]
+	// prediction set, to ensure we're not over fitting the training
+	xPred := t.makeMatrix(xIn[len(xIn)-predictionLength:])
+	yPred := yIn[len(xIn)-predictionLength:]
+
+	numClasses := len(y[0])
 
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	dataX := make([]float64, 0)
-	for i := range inputX {
-		dataX = append(dataX, inputX[i]...)
-	}
-	x := NewMatrixF(dataX, len(inputX), len(inputX[0]))
+	inputNeurons := len(xIn[0])
+	hiddenNeurons := 150
+	outputNeurons := numClasses // number of classes
 
-	inputNeurons := len(inputX[0])
-	hiddenNeurons := 100
-	outputNeurons := len(y[0]) // number of classes
+	if t.log {
+		log.Printf("checkpoint: initial loss should be roughly %f (1 out of %d)", -math.Log(1/float64(numClasses)), numClasses)
+	}
 
 	// initialize parameters randomly
 	W := NewRandomMatrix(inputNeurons, hiddenNeurons).ScalarMul(0.01)
@@ -43,7 +52,10 @@ func (t *trail) Train(inputX [][]float64, y [][]byte, numEpocs int) {
 
 	var hScore *Matrix
 
-	for epoch := 0; epoch < numEpocs; epoch++ {
+	// @todo print time per epoch
+	// @todo mini batch updates
+
+	for epoch := 0; epoch < numEpochs; epoch++ {
 
 		// evaluate class scores with a 2-layer Neural Network
 		hLayer := x.Dot(W).RowAdd(b).ElementMax(0) // Rectified linear unit (ReLU) activation
@@ -51,7 +63,12 @@ func (t *trail) Train(inputX [][]float64, y [][]byte, numEpocs int) {
 
 		if t.log && epoch%1 == 0 {
 			loss := t.loss(hScore, W, W2, y, reg)
-			log.Printf("epoch %d: loss: %f, accuracy %.1f%%", epoch+1, loss, t.accuracy(hScore, y)*100)
+			acc := t.accuracy(hScore, y)*100
+			log.Printf("epoch %d:  loss: %f,  accuracy %.1f%%", epoch+1, loss, acc)
+			pLayer := xPred.Dot(W).RowAdd(b).ElementMax(0) // Rectified linear unit (ReLU) activation
+			pScore := pLayer.Dot(W2).RowAdd(b2)
+			pAcc := t.accuracy(pScore, yPred)*100
+			log.Printf("            prediction set accuracy %.1f%%", pAcc-acc)
 
 		}
 
@@ -107,7 +124,7 @@ func (t *trail) Train(inputX [][]float64, y [][]byte, numEpocs int) {
 	}
 }
 
-func (t *trail) Predict(input []float64) []int {
+func (t *NeuralNet) Predict(input []float64) []int {
 	xTe := NewMatrixF(input, 1, len(input))
 
 	// evaluate class scores with a 2-layer Neural Network
@@ -117,7 +134,15 @@ func (t *trail) Predict(input []float64) []int {
 	return scores.ArgMax()
 }
 
-func (t *trail) loss(scores, W, W2 *Matrix, y [][]byte, reg float64) float64 {
+func (t *NeuralNet) makeMatrix(inputX [][]float64) *Matrix {
+	dataX := make([]float64, 0)
+	for i := range inputX {
+		dataX = append(dataX, inputX[i]...)
+	}
+	return NewMatrixF(dataX, len(inputX), len(inputX[0]))
+}
+
+func (t *NeuralNet) loss(scores, W, W2 *Matrix, y [][]byte, reg float64) float64 {
 	// get unnormalized probabilities
 	scoresExp := scores.Clone().ScalarExp()
 	// normalize them for each example
@@ -126,6 +151,8 @@ func (t *trail) loss(scores, W, W2 *Matrix, y [][]byte, reg float64) float64 {
 	correctLogProbs := probs.RowFinder(y).ScalarMinusLog()
 
 	// compute the loss: average cross-entropy loss and regularization
+	// cross-entropy gives us a way to express how different two probability
+	// distributions are, see http://colah.github.io/posts/2015-09-Visual-Information/
 	data_loss := correctLogProbs.Sum() / float64(len(y))
 	reg_loss := 0.5*reg*W.ElementMul(W).Sum() + 0.5*reg*W2.ElementMul(W2).Sum()
 	loss := data_loss + reg_loss
@@ -133,7 +160,7 @@ func (t *trail) loss(scores, W, W2 *Matrix, y [][]byte, reg float64) float64 {
 	return loss
 }
 
-func (t *trail) accuracy(scores *Matrix, y [][]byte) float64 {
+func (t *NeuralNet) accuracy(scores *Matrix, y [][]byte) float64 {
 	actual := scores.ArgMax()
 	correct := 0.0
 	for i := range actual {

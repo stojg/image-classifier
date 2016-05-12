@@ -7,46 +7,46 @@ import (
 )
 
 func main() {
-	trainingImgs, _ := loadCIFAR10("data/data_batch_1*")
-	testImgs, _ := loadCIFAR10("data/test_batch.bin")
+	// 50 000 images
+	trainingImages := loadCIFAR10("data/data_batch_*")
+	// 10 000 images
+	testImages := loadCIFAR10("data/test_batch.bin")
 	log.Printf("converting image data for classifier")
 
-	trainingX, trainingY := trainingImgs.asFloatSlices()
-	testX, testY := testImgs.asFloatSlices()
+	trainingX, trainingY := trainingImages.asFloatSlices()
+	testX, testY := testImages.asFloatSlices()
 
 	if len(trainingX) < 1 || len(testY) < 1 {
 		log.Printf("no training or test data found")
 		os.Exit(1)
 	}
+
+	trainingLen := 20000
+	testLen := 2000
 	n := Normaliser{}
-	trX := n.Normalise(trainingX[:1000])
-	trY := trainingY[:1000]
-	teX := n.Normalise(testX[9000:10000])
-	teY := testY[9000:10000]
+	trX := n.Normalise(trainingX[:trainingLen])
+	trY := trainingY[:trainingLen]
+	teX := n.Normalise(testX[:testLen])
+	teY := testY[:testLen]
 
 	log.Printf("training set size %d", len(trX))
 	log.Printf("test set size %d", len(teX))
 
-	neuralNet(trX, trY, teX, teY)
-	fmt.Println(".")
-}
+	nn := &NeuralNet{log: true}
+	log.Printf("training neural net")
+	nn.Train(trX, trY, 10)
 
-func neuralNet(trX [][]float64, trY [][]byte, teX [][]float64, teY [][]byte) {
-	nn := &trail{
-		log: true,
-	}
-	log.Printf("training trail")
-	nn.Train(trX, trY, 1000)
+	log.Printf("predicting on neural net")
 
-	log.Printf("predicting on trail")
 	var correct int
-	for i, p := range teX {
-		result := nn.Predict(p)
+	for i := range teX {
+		result := nn.Predict(teX[i])
 		if teY[i][result[0]] > 0 {
 			correct++
 		}
 	}
 	log.Printf("neural net classifier accuracy: %0.1f%% (%d / %d)", percent(correct, len(teY)), correct, len(teY))
+	fmt.Println(".")
 }
 
 func percent(a, b int) float64 {

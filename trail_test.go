@@ -19,7 +19,7 @@ func BenchmarkTrailTrain(b *testing.B) {
 		[]byte{0, 1},
 	}
 
-	trail := trail{}
+	trail := NeuralNet{}
 
 	for i := 0; i < b.N; i++ {
 		trail.Train(trX, trY, 10)
