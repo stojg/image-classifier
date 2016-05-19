@@ -96,16 +96,18 @@ func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs int) {
 		prediction := t.reluActivation(xPred.Dot(Win).RowAdd(biasIn))
 		predictionAccuracy := t.accuracy(prediction.Dot(WHidden).RowAdd(biasHidden), yPred) * 100
 
-		if t.log && epoch%25 == 0 {
-			log.Printf("epoch %d:  loss: %f,  accuracy %.1f%%", epoch, loss, accuracy)
-		}
-
 		if t.plot {
 			losses = append(losses, loss)
 			// accuracy plot
 			accuracies = append(accuracies, accuracy)
 			pAccuracies = append(pAccuracies, predictionAccuracy)
-			t.plotProgress(losses, accuracies, pAccuracies)
+		}
+
+		if t.log && epoch%25 == 0 {
+			log.Printf("epoch %d:  loss: %f,  accuracy %.1f%%", epoch, loss, accuracy)
+			if t.plot {
+				t.plotProgress(losses, accuracies, pAccuracies)
+			}
 		}
 
 		dScores := t.GradientDescent(scores, y)
@@ -138,6 +140,8 @@ func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs int) {
 		WHidden = WHidden.Add(dWHidden.ScalarMul(-stepSize))
 		biasHidden = biasHidden.Add(dBiasHidden.ScalarMul(-stepSize))
 	}
+
+	t.plotProgress(losses, accuracies, pAccuracies)
 
 	// "close" the gnuplots
 	t.lossPlot.Cmd("q")
