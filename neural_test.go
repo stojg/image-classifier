@@ -24,5 +24,5 @@ func BenchmarkTrailTrain(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		trail.Train(trX, trY, 10)
 	}
-	trailResult = trail.bestB2
+	trailResult = trail.hiddenBias
 }

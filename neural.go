@@ -1,21 +1,24 @@
 package main
 
 import (
+	"bitbucket.org/binet/go-gnuplot/pkg/gnuplot"
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"time"
-	"bitbucket.org/binet/go-gnuplot/pkg/gnuplot"
-	"fmt"
 )
 
 type NeuralNet struct {
-	labels [][]float64
-	bestW  *Matrix
-	bestB  *Matrix
-	bestW2 *Matrix
-	bestB2 *Matrix
-	log    bool
+	labels     [][]float64
+	W          *Matrix
+	bias       *Matrix
+	hiddenW    *Matrix
+	hiddenBias *Matrix
+	log        bool
+	plot       bool
+	lossPlot   *gnuplot.Plotter
+	accPlot    *gnuplot.Plotter
 }
 
 // @todo print time per epoch
@@ -26,132 +29,96 @@ type NeuralNet struct {
 func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs int) {
 
 	const (
-		reg      = 1e-3
-		stepSize = 0.03
+		reg      = 1e-4
+		stepSize = 0.02
 	)
 
-	var err error
-
-	// setup gnuplot for plotting the loss (brew install gnuplot)
-	var lossPlot *gnuplot.Plotter
-	if lossPlot, err = gnuplot.NewPlotter("", false, false); err != nil {
-		panic(fmt.Sprintf("** err: %v\n", err))
+	log.Printf("Randomising training data")
+	for i := range xIn {
+		j := rand.Intn(i + 1)
+		xIn[i], xIn[j] = xIn[j], xIn[i]
+		yIn[i], yIn[j] = yIn[j], yIn[i]
 	}
-	defer lossPlot.Close()
-	lossPlot.SetStyle("lines")
-	lossPlot.SetXLabel("epoch")
-	lossPlot.SetYLabel("loss")
 
-	// setup gnuplot for plotting the accuracy
-	var accPlot *gnuplot.Plotter
-	if accPlot, err = gnuplot.NewPlotter("", false, false); err != nil {
-		panic(fmt.Sprintf("** err: %v\n", err))
-	}
-	defer accPlot.Close()
-	accPlot.SetStyle("lines")
-	accPlot.SetXLabel("epoch")
-	accPlot.SetYLabel("accuracy %")
+	// setup gnuplots
+	t.initPlots()
+	defer t.lossPlot.Close()
+	defer t.accPlot.Close()
 
 	// use 10% of the test data for prediction, so we can check if we are over fitting the net, this
 	// data is not used to train the net.
-	predictionLength := int(math.Floor(float64(len(xIn)) / float64(10)))
-	x := t.makeMatrix(xIn[:len(xIn)-predictionLength])
-	y := yIn[:len(xIn)-predictionLength]
-	xPred := t.makeMatrix(xIn[len(xIn)-predictionLength:])
-	yPred := yIn[len(xIn)-predictionLength:]
-
-	// how many outputs does the neural net have
-	numClasses := len(y[0])
+	x, y, xPred, yPred := t.divide(10, xIn, yIn)
 
 	// bog standard seed of psuedo random generator, set to a fixed number to have a determistic
 	// starting point
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	inputNeurons := len(xIn[0])
-	hiddenNeurons := 200
-	outputNeurons := numClasses // number of classes
+	hiddenNeurons := 100
+	outputNeurons := len(y[0])
 
-	// the initial loss should be roughly 1/numclasses (cross entropy loss)
+	// Put up a checkpoint so we can check that the data and loss is set up correctly
 	if t.log {
-		log.Printf("checkpoint: initial loss should be roughly %f (1 out of %d)", -math.Log(1/float64(numClasses)), numClasses)
+		log.Printf("checkpoint: initial loss should be roughly %f (1 out of %d)", -math.Log(1/float64(outputNeurons)), outputNeurons)
 	}
 
 	// initialize parameters (weights) randomly for input -> hidden layer
-	W := NewRandomMatrix(inputNeurons, hiddenNeurons).ScalarMul(0.01)
-	b := NewZerosMatrix(1, hiddenNeurons)
+	Win := NewRandomMatrix(inputNeurons, hiddenNeurons).ScalarMul(0.01)
+	biasIn := NewZerosMatrix(1, hiddenNeurons)
 
 	// initialize parameters (weights) randomly for hiddent-> output layer
-	W2 := NewRandomMatrix(hiddenNeurons, outputNeurons).ScalarMul(0.01)
-	b2 := NewZerosMatrix(1, outputNeurons)
+	WHidden := NewRandomMatrix(hiddenNeurons, outputNeurons).ScalarMul(0.01)
+	biasHidden := NewZerosMatrix(1, outputNeurons)
 
 	// keep a running tally of the score between hidden -> output so that we can print
 	// it after the epoch loop
-	var hScore *Matrix
+	var scores *Matrix
 
 	// these are used so that we can update gnuplots with the data
 	var (
-		losses []float64
-		accuracies []float64
+		losses      []float64
+		accuracies  []float64
 		pAccuracies []float64
 	)
 
+	// The training loop
 	for epoch := 0; epoch < numEpochs; epoch++ {
 
 		// evaluate class scores between input -> hidden
-		hLayer := x.Dot(W).RowAdd(b).ElementMax(0) // the ElemementMax(0) is the rectified linear unit (ReLU) activation
-		// final score of the output
-		hScore = hLayer.Dot(W2).RowAdd(b2)
+		hiddenScores := t.reluActivation(x.Dot(Win).RowAdd(biasIn))
+		// final output layer "scores"
+		scores = hiddenScores.Dot(WHidden).RowAdd(biasHidden)
 
-		// diagnostic output via console and gnuplot
-		if t.log && epoch%1 == 0 {
-			loss := t.loss(hScore, W, W2, y, reg)
-			acc := t.accuracy(hScore, y)*100
-			if epoch%1 == 25 {
-				log.Printf("epoch %d:  loss: %f,  accuracy %.1f%%", epoch + 1, loss, acc)
-			}
-			pLayer := xPred.Dot(W).RowAdd(b).ElementMax(0) // Rectified linear unit (ReLU) activation
-			pScore := pLayer.Dot(W2).RowAdd(b2)
-			pAcc := t.accuracy(pScore, yPred)*100
+		loss := t.calculateLoss(scores, Win, WHidden, y, reg)
+		accuracy := t.accuracy(scores, y) * 100
 
-			// loss plot
+		// prediction
+		prediction := t.reluActivation(xPred.Dot(Win).RowAdd(biasIn))
+		predictionAccuracy := t.accuracy(prediction.Dot(WHidden).RowAdd(biasHidden), yPred) * 100
+
+		if t.log && epoch%25 == 0 {
+			log.Printf("epoch %d:  loss: %f,  accuracy %.1f%%", epoch, loss, accuracy)
+		}
+
+		if t.plot {
 			losses = append(losses, loss)
-			lossPlot.ResetPlot()
-			lossPlot.PlotX(losses, "loss (cross-entropy)")
-
 			// accuracy plot
-			accuracies = append(accuracies, acc)
-			pAccuracies = append(pAccuracies, pAcc)
-			accPlot.ResetPlot()
-			accPlot.PlotX(accuracies, "test")
-			accPlot.PlotX(pAccuracies, "validation")
+			accuracies = append(accuracies, accuracy)
+			pAccuracies = append(pAccuracies, predictionAccuracy)
+			t.plotProgress(losses, accuracies, pAccuracies)
 		}
 
-		// find the gradient descent for output
-		dScores := hScore.Clone()
-		for row := range y {
-			for col := range y[row] {
-				if y[row][col] > 0 {
-					// by decreasing the hScore[j] that was the correct answer with
-					// 1 we find the gradient descent in the direction where the
-					// loss function is decreasing the most. But honestly, it's a bit
-					// fuzzy for me how the ReLu gradient actually works
-					dScores.data[row*dScores.cols+col] -= 1
-					break
-				}
-			}
-		}
-		// calculate the the average
-		dScores = dScores.ScalarDiv(float64(x.rows))
+		dScores := t.GradientDescent(scores, y)
 
 		// back propagate the gradient to the parameters
-		// 1) back propagate into the hidden -> ouput parameters
-		dW2 := hLayer.Transpose().Dot(dScores)
-		db2 := dScores.ColSum()
+		// 1) back propagate into the hidden -> output parameters
+		dWHidden := hiddenScores.Transpose().Dot(dScores)
+		dBiasHidden := dScores.ColSum()
 		// 2) next back propagate into input -> hidden parameters
-		dHidden := dScores.Dot(W2.Transpose())
+		dHidden := dScores.Dot(WHidden.Transpose())
 		// back propagate the ReLU non-linearity
 		for i := range dHidden.data {
-			if hLayer.data[i] < 0 {
+			if hiddenScores.data[i] < 0 {
 				dHidden.data[i] = 0
 			}
 		}
@@ -162,52 +129,62 @@ func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs int) {
 
 		// add regularization gradient contribution, basically penalise
 		// changes so that we don't overfit
-		dW2 = dW2.Add(W2.ScalarMul(reg))
-		dW = dW.Add(W.ScalarMul(reg))
+		dWHidden = dWHidden.Add(WHidden.ScalarMul(reg))
+		dW = dW.Add(Win.ScalarMul(reg))
 
 		// stochastic parameter update
-		W = W.Add(dW.ScalarMul(-stepSize))
-		b = b.Add(db.ScalarMul(-stepSize))
-		W2 = W2.Add(dW2.ScalarMul(-stepSize))
-		b2 = b2.Add(db2.ScalarMul(-stepSize))
+		Win = Win.Add(dW.ScalarMul(-stepSize))
+		biasIn = biasIn.Add(db.ScalarMul(-stepSize))
+		WHidden = WHidden.Add(dWHidden.ScalarMul(-stepSize))
+		biasHidden = biasHidden.Add(dBiasHidden.ScalarMul(-stepSize))
 	}
 
 	// "close" the gnuplots
-	lossPlot.CheckedCmd("q")
-	accPlot.CheckedCmd("q")
+	t.lossPlot.Cmd("q")
+	t.accPlot.Cmd("q")
 
 	// save the final values so that Predict() can find them
-	t.bestW2 = W2
-	t.bestB2 = b2
-	t.bestW = W
-	t.bestB = b
+	t.hiddenW = WHidden
+	t.hiddenBias = biasHidden
+	t.W = Win
+	t.bias = biasIn
 
 	if t.log {
-		loss := t.loss(hScore, W, W2, y, reg)
-		log.Printf("result: loss: %f, accuracy %.1f%%", loss, t.accuracy(hScore, y)*100)
+		loss := t.calculateLoss(scores, Win, WHidden, y, reg)
+		log.Printf("result: loss: %f, accuracy %.1f%%", loss, t.accuracy(scores, y)*100)
 	}
 }
 
+func (t *NeuralNet) plotProgress(losses, acc, pacc []float64) {
+
+	t.lossPlot.ResetPlot()
+	t.lossPlot.PlotX(losses, "loss (cross-entropy)")
+
+	// accuracy plot
+	t.accPlot.ResetPlot()
+	t.accPlot.PlotX(acc, "test")
+	t.accPlot.PlotX(pacc, "validation")
+
+}
 func (t *NeuralNet) Predict(input []float64) []int {
 
 	// convert into a matrix
 	xTe := NewMatrixF(input, 1, len(input))
 	// evaluate class scores with a 2-layer Neural Network
-	hiddenLayer := xTe.Dot(t.bestW).RowAdd(t.bestB).ElementMax(0) // ReLU activation
-	scores := hiddenLayer.Dot(t.bestW2).RowAdd(t.bestB2)
+	hiddenLayer := xTe.Dot(t.W).RowAdd(t.bias).ElementMax(0) // ReLU activation
+	scores := hiddenLayer.Dot(t.hiddenW).RowAdd(t.hiddenBias)
 
 	return scores.ArgMax()
 }
 
 // calculate the loss function with an average cross-entropy
-func (t *NeuralNet) loss(scores, W, W2 *Matrix, y [][]byte, reg float64) float64 {
+func (t *NeuralNet) calculateLoss(scores, W, W2 *Matrix, y [][]byte, reg float64) float64 {
 	// get unnormalized probabilities
 	scoresExp := scores.Clone().ScalarExp()
 	// normalize them for each example
 	probs := scoresExp.ColDiv(scoresExp.RowSum())
 	// We can now query for the log probabilities assigned to the correct classes in each example:
 	correctLogProbs := probs.RowFinder(y).ScalarMinusLog()
-
 	// compute the loss: average cross-entropy loss and regularization
 	// cross-entropy gives us a way to express how different two probability
 	// distributions are, see http://colah.github.io/posts/2015-09-Visual-Information/
@@ -216,6 +193,57 @@ func (t *NeuralNet) loss(scores, W, W2 *Matrix, y [][]byte, reg float64) float64
 	loss := data_loss + reg_loss
 
 	return loss
+}
+
+func (t *NeuralNet) GradientDescent(A *Matrix, y [][]byte) *Matrix {
+	// find the gradient descent for output
+	dScores := A.Clone()
+	for row := range y {
+		for col := range y[row] {
+			if y[row][col] > 0 {
+				// by decreasing the hScore[j] that was the correct answer with
+				// 1 we find the gradient descent in the direction where the
+				// loss function is decreasing the most. But honestly, it's a bit
+				// fuzzy for me how the ReLu gradient actually works
+				dScores.data[row*dScores.cols+col] -= 1
+				break
+			}
+		}
+	}
+	// calculate the the average
+	return dScores.ScalarDiv(float64(A.rows))
+}
+
+//  Rectified Linear unit
+func (t *NeuralNet) reluActivation(A *Matrix) *Matrix {
+	return A.ElementMax(0)
+}
+
+// setup gnuplot for plotting the loss and accuracy (brew install gnuplot)
+func (t *NeuralNet) initPlots() {
+	var err error
+
+	var lossPlot *gnuplot.Plotter
+	if lossPlot, err = gnuplot.NewPlotter("", false, false); err != nil {
+		panic(fmt.Sprintf("** err: %v\n", err))
+	}
+
+	lossPlot.SetStyle("lines")
+	lossPlot.SetXLabel("epoch")
+	lossPlot.SetYLabel("loss")
+
+	var accPlot *gnuplot.Plotter
+
+	if accPlot, err = gnuplot.NewPlotter("", false, false); err != nil {
+		panic(fmt.Sprintf("** err: %v\n", err))
+	}
+	accPlot.SetStyle("lines")
+	accPlot.SetXLabel("epoch")
+	accPlot.SetYLabel("accuracy %")
+	accPlot.Cmd("set yrange [0:110]")
+
+	t.lossPlot = lossPlot
+	t.accPlot = accPlot
 }
 
 // accuracy returns a accuracy between 0.0 - 1.0 on how correct a score (classification)
@@ -229,6 +257,15 @@ func (t *NeuralNet) accuracy(scores *Matrix, y [][]byte) float64 {
 		}
 	}
 	return correct / float64(len(y))
+}
+
+func (t *NeuralNet) divide(percent int, xIn [][]float64, yIn [][]byte) (*Matrix, [][]byte, *Matrix, [][]byte) {
+	predictionLength := int(math.Floor(float64(len(xIn)) / float64(percent)))
+	x := t.makeMatrix(xIn[:len(xIn)-predictionLength])
+	y := yIn[:len(xIn)-predictionLength]
+	xPred := t.makeMatrix(xIn[len(xIn)-predictionLength:])
+	yPred := yIn[len(xIn)-predictionLength:]
+	return x, y, xPred, yPred
 }
 
 func (t *NeuralNet) makeMatrix(inputX [][]float64) *Matrix {
