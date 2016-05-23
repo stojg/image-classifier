@@ -395,6 +395,10 @@ func (A *Matrix) Print() {
 	fmt.Printf("\n")
 }
 
+func (A *Matrix) PrintSize() {
+	fmt.Printf("--- %d X %d ---\n[", A.rows, A.cols)
+}
+
 func (A *Matrix) slice(rows, cols int) [][]float64 {
 	data := make([][]float64, rows)
 	for i := range data {
@@ -403,7 +407,7 @@ func (A *Matrix) slice(rows, cols int) [][]float64 {
 	return data
 }
 
-func (A *Matrix) Transpose() *Matrix {
+func (A *Matrix) T() *Matrix {
 	t := make([]float64, len(A.data))
 	for row := 0; row < A.rows; row++ {
 		for col := 0; col < A.cols; col++ {

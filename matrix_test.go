@@ -249,7 +249,7 @@ func TestMatrixTranspose(t *testing.T) {
 		[]float64{2, 4, 6},
 	})
 
-	actual := A.Transpose()
+	actual := A.T()
 
 	if !actual.Equals(expected) {
 		t.Errorf("not correct")

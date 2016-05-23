@@ -26,7 +26,7 @@ func main() {
 
 	log.Printf("training neural net")
 	// train the network with n epochs
-	nn.Train(trX, trY, 20000)
+	nn.Train(trX, trY, 10000)
 
 	//log.Printf("test set size %d", len(teX))
 	//log.Printf("predicting on neural net")
