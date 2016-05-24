@@ -290,7 +290,6 @@ func TestMatrixColSum(t *testing.T) {
 	}
 }
 
-
 func BenchmarkMatrixColSum(b *testing.B) {
 	A := NewMatrix([][]float64{
 		[]float64{1, 2, 3},

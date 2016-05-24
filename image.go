@@ -27,8 +27,8 @@ func (c ImageSet) asFloatSlices() ([][]float64, [][]byte) {
 	return x, y
 }
 
-func loadCIFAR10(pattern string) ImageSet {
-	var set = make([]CIFAR10Image, 0)
+func cifar10Loader(pattern string) ([][]float64, [][]byte, error) {
+	var set = make(ImageSet, 0)
 	trainingFiles, err := filepath.Glob(pattern)
 	if err != nil {
 		log.Printf("error when trying to find training data: %s", err)
@@ -46,7 +46,9 @@ func loadCIFAR10(pattern string) ImageSet {
 		set = append(set, images...)
 	}
 
-	return set
+	x, y := set.asFloatSlices()
+
+	return x, y, nil
 }
 
 func imagesFromFile(filename string) (ImageSet, error) {
