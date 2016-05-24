@@ -11,9 +11,9 @@ import (
 type NeuralNet struct {
 	labels   [][]float64
 	W1       *Matrix
-	bias1    *Matrix
+	Bias1    *Matrix
 	W2       *Matrix
-	bias2    *Matrix
+	Bias2    *Matrix
 	log      bool
 	plot     bool
 	lossPlot *gnuplot.Plotter
@@ -26,7 +26,7 @@ type NeuralNet struct {
 // @todo add more depth with convnets for image processing
 // @todo use all CPU cores
 // @todo link with a proper C lib for faster linear algebra (e.g. https://github.com/gonum/blas)
-func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs, numBatches int) {
+func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs, numBatches, predictions int) {
 
 	t.reg = 1e-3
 	t.stepSize = 0.001
@@ -47,11 +47,11 @@ func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs, numBatches i
 
 	// initialize parameters (weights) randomly for input -> hidden layer
 	t.W1 = NewRandomMatrix(inputNeurons, hiddenNeurons).ScalarMul(0.01)
-	t.bias1 = NewRandomMatrix(1, hiddenNeurons).ScalarMul(0.01)
+	t.Bias1 = NewRandomMatrix(1, hiddenNeurons).ScalarMul(0.01)
 
 	// initialize parameters (weights) randomly for hidden-> output layer
 	t.W2 = NewRandomMatrix(hiddenNeurons, outputNeurons).ScalarMul(0.01)
-	t.bias2 = NewRandomMatrix(1, outputNeurons).ScalarMul(0.01)
+	t.Bias2 = NewRandomMatrix(1, outputNeurons).ScalarMul(0.01)
 
 	// keep a running tally of the score between hidden -> output so that we can print
 	// it after the epoch loop
@@ -64,17 +64,17 @@ func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs, numBatches i
 		pAccuracies []float64
 	)
 
-	xAll, yAll, xPred, yPred := t.divide(10, xIn, yIn)
+	xAll, yAll, xPred, yPred := t.divide(predictions, xIn, yIn)
 
 	// The training loop
 	for epoch := 0; epoch < numEpochs; epoch++ {
 
 		xBatches, yBatches := t.getBatches(numBatches, xAll, yAll)
 
-		dW1 := NewZerosMatrix(t.W1.rows, t.W1.cols)
-		dBias1 := NewZerosMatrix(t.bias1.rows, t.bias1.cols)
-		dW2 := NewZerosMatrix(t.W2.rows, t.W2.cols)
-		dBias2 := NewZerosMatrix(t.bias2.rows, t.bias2.cols)
+		dW1 := NewZerosMatrix(t.W1.Rows, t.W1.Cols)
+		dBias1 := NewZerosMatrix(t.Bias1.Rows, t.Bias1.Cols)
+		dW2 := NewZerosMatrix(t.W2.Rows, t.W2.Cols)
+		dBias2 := NewZerosMatrix(t.Bias2.Rows, t.Bias2.Cols)
 
 		for i := range xBatches {
 			a, b, c, d := t.GradientDescent(xBatches[i], yBatches[i])
@@ -86,21 +86,21 @@ func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs, numBatches i
 
 		// parameter update
 		t.W2 = t.W2.Sub(dW2.ScalarMul(t.stepSize))
-		t.bias2 = t.bias2.Sub(dBias2.ScalarMul(t.stepSize))
+		t.Bias2 = t.Bias2.Sub(dBias2.ScalarMul(t.stepSize))
 
 		// parameter update
 		t.W1 = t.W1.Sub(dW1.ScalarMul(t.stepSize))
-		t.bias1 = t.bias1.Sub(dBias1.ScalarMul(t.stepSize))
+		t.Bias1 = t.Bias1.Sub(dBias1.ScalarMul(t.stepSize))
 
 		// calculate loss
-		hiddenLayer := t.ReLu(NewMatrix(xAll).Dot(t.W1).RowAdd(t.bias1))
-		outputLayer = hiddenLayer.Dot(t.W2).RowAdd(t.bias2)
+		hiddenLayer := t.ReLu(NewMatrix(xAll).Dot(t.W1).RowAdd(t.Bias1))
+		outputLayer = hiddenLayer.Dot(t.W2).RowAdd(t.Bias2)
 		loss := t.softMaxLoss(outputLayer, t.W1, yAll, t.reg)
 		trainingError := t.error(outputLayer, yAll) * 100
 
 		// calculate how well we can predict
-		pHiddenLayer := t.ReLu(NewMatrix(xPred).Dot(t.W1).RowAdd(t.bias1))
-		pOutputLayer := pHiddenLayer.Dot(t.W2).RowAdd(t.bias2)
+		pHiddenLayer := t.ReLu(NewMatrix(xPred).Dot(t.W1).RowAdd(t.Bias1))
+		pOutputLayer := pHiddenLayer.Dot(t.W2).RowAdd(t.Bias2)
 		predictionError := t.error(pOutputLayer, yPred) * 100
 
 		if t.plot {
@@ -123,8 +123,8 @@ func (t *NeuralNet) Predict(input []float64) []int {
 	// convert into a matrix
 	xTe := NewMatrixF(input, 1, len(input))
 	// evaluate class scores with a 2-layer Neural Network
-	hiddenLayer := t.ReLu(xTe.Dot(t.W1).RowAdd(t.bias1))
-	scores := hiddenLayer.Dot(t.W2).RowAdd(t.bias2)
+	hiddenLayer := t.ReLu(xTe.Dot(t.W1).RowAdd(t.Bias1))
+	scores := hiddenLayer.Dot(t.W2).RowAdd(t.Bias2)
 	return scores.ArgMax()
 }
 
@@ -158,9 +158,9 @@ func (t *NeuralNet) getBatches(batchSize int, xAll [][]float64, yAll [][]byte) (
 func (t *NeuralNet) GradientDescent(x *Matrix, y [][]byte) (*Matrix, *Matrix, *Matrix, *Matrix) {
 
 	// evaluate input -> hidden
-	hiddenLayer := t.ReLu(x.Dot(t.W1).RowAdd(t.bias1))
+	hiddenLayer := t.ReLu(x.Dot(t.W1).RowAdd(t.Bias1))
 	// final output layer "scores", note that there we don't need a ReLU activation
-	outputLayer := hiddenLayer.Dot(t.W2).RowAdd(t.bias2)
+	outputLayer := hiddenLayer.Dot(t.W2).RowAdd(t.Bias2)
 
 	// Start the backward propagation
 	grad := t.softMaxGradient(outputLayer, y)
@@ -217,13 +217,13 @@ func (t *NeuralNet) softMaxGradient(A *Matrix, y [][]byte) *Matrix {
 				// 1 we find the gradient descent in the direction where the
 				// loss function is decreasing the most. But honestly, it's a bit
 				// fuzzy for me how this actually works
-				dScores.data[row*dScores.cols+col] -= 1
+				dScores.Data[row*dScores.Cols+col] -= 1
 				break
 			}
 		}
 	}
 	// calculate the the average
-	return dScores.ScalarDiv(float64(A.rows))
+	return dScores.ScalarDiv(float64(A.Rows))
 }
 
 //  Rectified Linear unit
@@ -234,9 +234,9 @@ func (t *NeuralNet) ReLu(A *Matrix) *Matrix {
 func (t *NeuralNet) ReLuBackProp(dTheta, layer *Matrix) {
 	// ReLu will not propagate back  any corrections
 	// to a node that was correct (below 0)
-	for i := range dTheta.data {
-		if layer.data[i] < 0 {
-			dTheta.data[i] = 0
+	for i := range dTheta.Data {
+		if layer.Data[i] < 0 {
+			dTheta.Data[i] = 0
 		}
 	}
 }
@@ -282,11 +282,12 @@ func (t *NeuralNet) error(scores *Matrix, y [][]byte) float64 {
 }
 
 func (t *NeuralNet) divide(percent int, xIn [][]float64, yIn [][]byte) ([][]float64, [][]byte, [][]float64, [][]byte) {
-	predictionLength := int(math.Floor(float64(len(xIn)) / float64(percent)))
+	predictionLength := int(math.Floor(float64(len(xIn)) / float64(100.0/percent)))
 	x := xIn[:len(xIn)-predictionLength]
 	y := yIn[:len(xIn)-predictionLength]
 	xPred := xIn[len(xIn)-predictionLength:]
 	yPred := yIn[len(xIn)-predictionLength:]
+
 	return x, y, xPred, yPred
 }
 

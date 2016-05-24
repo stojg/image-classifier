@@ -6,16 +6,10 @@ import (
 	"math/rand"
 )
 
-type Vector struct {
-	cols int
-	rows int
-	data []float64
-}
-
 type Matrix struct {
-	rows int
-	cols int
-	data []float64
+	Rows int
+	Cols int
+	Data []float64
 }
 
 func NewMatrix(m [][]float64) *Matrix {
@@ -26,9 +20,9 @@ func NewMatrix(m [][]float64) *Matrix {
 	}
 
 	return &Matrix{
-		rows: len(m),
-		cols: len(m[0]),
-		data: flattened,
+		Rows: len(m),
+		Cols: len(m[0]),
+		Data: flattened,
 	}
 }
 
@@ -59,37 +53,21 @@ func NewMatrixF(m []float64, rows, cols int) *Matrix {
 		panic(fmt.Sprintf("rows (%d) and cols (%d) dont match up with data length (%d)", rows, cols, len(m)))
 	}
 	return &Matrix{
-		rows: rows,
-		cols: cols,
-		data: m,
+		Rows: rows,
+		Cols: cols,
+		Data: m,
 	}
-}
-
-func NewVector(v []float64) *Vector {
-	return &Vector{
-		rows: len(v),
-		cols: 1,
-		data: v,
-	}
-}
-
-func (V *Vector) Len() int {
-	return V.rows
-}
-
-func (V *Vector) Transpose() *Matrix {
-	return NewMatrixF(V.data, V.rows, 1)
 }
 
 func (A *Matrix) Dim() (int, int) {
-	return A.rows, A.cols
+	return A.Rows, A.Cols
 }
 
 func (A *Matrix) Idx(v float64) (int, int) {
-	for i := range A.data {
-		if A.data[i] == v {
-			row := math.Floor(float64(i) / float64(A.cols))
-			col := math.Floor(float64(i) / float64(A.rows))
+	for i := range A.Data {
+		if A.Data[i] == v {
+			row := math.Floor(float64(i) / float64(A.Cols))
+			col := math.Floor(float64(i) / float64(A.Rows))
 			return int(row), int(col)
 		}
 	}
@@ -97,54 +75,29 @@ func (A *Matrix) Idx(v float64) (int, int) {
 }
 
 func (A *Matrix) At(row, col int) float64 {
-	return A.data[row*A.cols+col]
-}
-
-func (A *Matrix) MulVec(B *Vector) *Matrix {
-	if A.cols != B.rows {
-		panic(fmt.Sprintf("matrix.MulVec() A.cols (%d) != v.rows (%d)", A.cols, B.rows))
-	}
-
-	aRows := A.rows
-	aCols := A.cols
-	bCols := B.cols
-
-	result := make([]float64, aRows*bCols)
-	row := make([]float64, aCols)
-
-	for r := 0; r < aRows; r++ {
-		for aCol := range row {
-			row[aCol] = A.data[r*aCols+aCol]
-		}
-		var v float64
-		for i, e := range row {
-			v += e * B.data[i*bCols]
-		}
-		result[r*bCols] = v
-	}
-	return NewMatrixF(result, aRows, bCols)
+	return A.Data[row*A.Cols+col]
 }
 
 func (A *Matrix) Dot(B *Matrix) *Matrix {
-	if A.cols != B.rows {
-		panic(fmt.Sprintf("matrix.Mul() A.cols (%d) != B.rows (%d)", A.cols, B.rows))
+	if A.Cols != B.Rows {
+		panic(fmt.Sprintf("matrix.Mul() A.cols (%d) != B.rows (%d)", A.Cols, B.Rows))
 	}
 
-	aRows := A.rows
-	aCols := A.cols
-	bCols := B.cols
+	aRows := A.Rows
+	aCols := A.Cols
+	bCols := B.Cols
 
 	result := make([]float64, aRows*bCols)
 	row := make([]float64, aCols)
 
 	for r := 0; r < aRows; r++ {
 		for col := range row {
-			row[col] = A.data[r*aCols+col]
+			row[col] = A.Data[r*aCols+col]
 		}
 		for c := 0; c < bCols; c++ {
 			var v float64
 			for i, e := range row {
-				v += e * B.data[i*bCols+c]
+				v += e * B.Data[i*bCols+c]
 			}
 			result[r*bCols+c] = v
 		}
@@ -153,66 +106,76 @@ func (A *Matrix) Dot(B *Matrix) *Matrix {
 }
 
 func (A *Matrix) RowAdd(B *Matrix) *Matrix {
-	if A.cols != B.cols {
+	if A.Cols != B.Cols {
 		panic("dont have the same num of cols!")
 	}
-	res := make([]float64, len(A.data))
-	for i := range A.data {
-		for j := range B.data {
-			res[i] = A.data[i] + B.data[j]
+	res := make([]float64, len(A.Data))
+	for i := range A.Data {
+		for j := range B.Data {
+			res[i] = A.Data[i] + B.Data[j]
 		}
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) RowSum() *Matrix {
-	res := make([]float64, A.rows)
-	for row := 0; row < A.rows; row++ {
+	res := make([]float64, A.Rows)
+	for row := 0; row < A.Rows; row++ {
 		sum := 0.0
-		for col := 0; col < A.cols; col++ {
-			sum += A.data[row*A.cols+col]
+		for col := 0; col < A.Cols; col++ {
+			sum += A.Data[row*A.Cols+col]
 		}
 		res[row] = sum
 	}
-	return NewMatrixF(res, A.rows, 1)
+	return NewMatrixF(res, A.Rows, 1)
 }
 
 func (A *Matrix) ColSum() *Matrix {
-	res := make([]float64, A.cols)
-	for row := 0; row < A.rows; row++ {
-		for col := 0; col < A.cols; col++ {
-			res[col] += A.data[row*A.cols+col]
+	res := make([]float64, A.Cols)
+	for row := 0; row < A.Rows; row++ {
+		for col := 0; col < A.Cols; col++ {
+			res[col] += A.Data[row*A.Cols+col]
 		}
 	}
-	return NewMatrixF(res, 1, A.cols)
+	return NewMatrixF(res, 1, A.Cols)
+}
+
+func (A *Matrix) ColSumOld() *Matrix {
+	res := make([]float64, A.Cols)
+	for row := 0; row < A.Rows; row++ {
+		for col := 0; col < A.Cols; col++ {
+			res[col] += A.Data[row*A.Cols+col]
+		}
+	}
+	return NewMatrixF(res, 1, A.Cols)
 }
 
 func (A *Matrix) ColDiv(B *Matrix) *Matrix {
-	if A.rows != B.rows {
+	if A.Rows != B.Rows {
 		panic("A and B dont have the same # of cols")
 	}
 
-	if B.cols != 1 {
+	if B.Cols != 1 {
 		panic("B.cols must be 1")
 	}
 
-	res := make([]float64, len(A.data))
-	for row, divider := range B.data {
-		for col := 0; col < A.cols; col++ {
-			res[row*A.cols+col] = A.data[row*A.cols+col] / divider
+	res := make([]float64, len(A.Data))
+	for row, divider := range B.Data {
+		for col := 0; col < A.Cols; col++ {
+			res[row*A.Cols+col] = A.Data[row*A.Cols+col] / divider
 		}
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) ArgMax() []int {
-	res := make([]int, A.rows)
-	for row := 0; row < A.rows; row++ {
+	res := make([]int, A.Rows)
+	for row := 0; row < A.Rows; row++ {
 		highest := math.Inf(-1)
-		for col := 0; col < A.cols; col++ {
-			if A.data[row*A.cols+col] > highest {
+		for col := 0; col < A.Cols; col++ {
+			if A.Data[row*A.Cols+col] > highest {
 				res[row] = int(col)
-				highest = A.data[row*A.cols+col]
+				highest = A.Data[row*A.Cols+col]
 			}
 		}
 	}
@@ -220,33 +183,33 @@ func (A *Matrix) ArgMax() []int {
 }
 
 func (A *Matrix) Add(B *Matrix) *Matrix {
-	if A.cols != B.cols || A.rows != B.rows {
-		panic(fmt.Sprintf("matrix.Add() matrices must be the same size, A %dX%d, B %dX%d", A.rows, A.cols, B.rows, B.cols))
+	if A.Cols != B.Cols || A.Rows != B.Rows {
+		panic(fmt.Sprintf("matrix.Add() matrices must be the same size, A %dX%d, B %dX%d", A.Rows, A.Cols, B.Rows, B.Cols))
 	}
-	res := make([]float64, len(A.data))
-	for i := range A.data {
-		res[i] = A.data[i] + B.data[i]
+	res := make([]float64, len(A.Data))
+	for i := range A.Data {
+		res[i] = A.Data[i] + B.Data[i]
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) Sub(B *Matrix) *Matrix {
-	if A.cols != B.cols || A.rows != B.rows {
+	if A.Cols != B.Cols || A.Rows != B.Rows {
 		panic(fmt.Sprintf("matrix.Add() matrices must be the same size"))
 	}
-	res := make([]float64, len(A.data))
-	for i := range A.data {
-		res[i] = A.data[i] - B.data[i]
+	res := make([]float64, len(A.Data))
+	for i := range A.Data {
+		res[i] = A.Data[i] - B.Data[i]
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) Equals(B *Matrix) bool {
-	if A.rows != B.rows || A.cols != B.cols {
+	if A.Rows != B.Rows || A.Cols != B.Cols {
 		return false
 	}
-	for i := range A.data {
-		if A.data[i] != B.data[i] {
+	for i := range A.Data {
+		if A.Data[i] != B.Data[i] {
 			return false
 		}
 	}
@@ -255,7 +218,7 @@ func (A *Matrix) Equals(B *Matrix) bool {
 
 func (A *Matrix) Max() float64 {
 	max := math.Inf(-1)
-	for _, val := range A.data {
+	for _, val := range A.Data {
 		if val > max {
 			max = val
 		}
@@ -264,16 +227,16 @@ func (A *Matrix) Max() float64 {
 }
 
 func (A *Matrix) ElementMax(max float64) *Matrix {
-	res := make([]float64, len(A.data))
-	for i := range A.data {
-		res[i] = math.Max(max, A.data[i])
+	res := make([]float64, len(A.Data))
+	for i := range A.Data {
+		res[i] = math.Max(max, A.Data[i])
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) Min() float64 {
 	max := math.Inf(1)
-	for _, val := range A.data {
+	for _, val := range A.Data {
 		if val < max {
 			max = val
 		}
@@ -283,18 +246,18 @@ func (A *Matrix) Min() float64 {
 
 func (A *Matrix) Sum() float64 {
 	var sum float64
-	for _, val := range A.data {
+	for _, val := range A.Data {
 		sum += val
 	}
 	return sum
 }
 
 func (A *Matrix) ElementMul(B *Matrix) *Matrix {
-	res := make([]float64, len(A.data))
-	for i := range A.data {
-		res[i] = A.data[i] * B.data[i]
+	res := make([]float64, len(A.Data))
+	for i := range A.Data {
+		res[i] = A.Data[i] * B.Data[i]
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) RowFinder(y [][]byte) *Matrix {
@@ -314,78 +277,78 @@ func (A *Matrix) RowFinder(y [][]byte) *Matrix {
 }
 
 func (A *Matrix) AsIntSlice() []int {
-	d := make([]int, len(A.data))
-	for i, val := range A.data {
+	d := make([]int, len(A.Data))
+	for i, val := range A.Data {
 		d[i] = int(val)
 	}
 	return d
 }
 
 func (A *Matrix) ScalarSub(v float64) *Matrix {
-	res := make([]float64, len(A.data))
+	res := make([]float64, len(A.Data))
 	for i := range res {
-		res[i] = A.data[i] - v
+		res[i] = A.Data[i] - v
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) ScalarMul(val float64) *Matrix {
-	res := make([]float64, len(A.data))
+	res := make([]float64, len(A.Data))
 	for i := range res {
-		res[i] = A.data[i] * val
+		res[i] = A.Data[i] * val
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) ScalarDiv(val float64) *Matrix {
-	res := make([]float64, len(A.data))
+	res := make([]float64, len(A.Data))
 	for i := range res {
-		res[i] = A.data[i] / val
+		res[i] = A.Data[i] / val
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) ScalarExp() *Matrix {
-	res := make([]float64, len(A.data))
+	res := make([]float64, len(A.Data))
 	for i := range res {
-		res[i] = math.Exp(A.data[i])
+		res[i] = math.Exp(A.Data[i])
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) ScalarMinusLog() *Matrix {
-	res := make([]float64, len(A.data))
+	res := make([]float64, len(A.Data))
 	for i := range res {
-		res[i] = -math.Log(A.data[i])
+		res[i] = -math.Log(A.Data[i])
 	}
-	return NewMatrixF(res, A.rows, A.cols)
+	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
 func (A *Matrix) Clone() *Matrix {
-	clonedData := make([]float64, len(A.data))
-	copy(clonedData, A.data)
-	return NewMatrixF(clonedData, A.rows, A.cols)
+	clonedData := make([]float64, len(A.Data))
+	copy(clonedData, A.Data)
+	return NewMatrixF(clonedData, A.Rows, A.Cols)
 }
 
 func (A *Matrix) AbsSum() float64 {
 	var sum float64
-	for i := range A.data {
-		if A.data[i] < 0 {
-			sum += -A.data[i]
+	for i := range A.Data {
+		if A.Data[i] < 0 {
+			sum += -A.Data[i]
 		} else {
-			sum += A.data[i]
+			sum += A.Data[i]
 		}
 	}
 	return sum
 }
 
 func (A *Matrix) Print() {
-	fmt.Printf("--- %d X %d ---\n[", A.rows, A.cols)
+	fmt.Printf("--- %d X %d ---\n[", A.Rows, A.Cols)
 
-	for i := range A.data {
-		fmt.Printf("\t%0.2f\t", A.data[i])
-		if i%A.cols == A.cols-1 {
-			if i+1 == len(A.data) {
+	for i := range A.Data {
+		fmt.Printf("\t%0.2f\t", A.Data[i])
+		if i%A.Cols == A.Cols-1 {
+			if i+1 == len(A.Data) {
 				fmt.Printf("]")
 			} else {
 				fmt.Printf("]\n[ ")
@@ -396,7 +359,7 @@ func (A *Matrix) Print() {
 }
 
 func (A *Matrix) PrintSize() {
-	fmt.Printf("--- %d X %d ---\n[", A.rows, A.cols)
+	fmt.Printf("--- %d X %d ---\n[", A.Rows, A.Cols)
 }
 
 func (A *Matrix) slice(rows, cols int) [][]float64 {
@@ -408,11 +371,11 @@ func (A *Matrix) slice(rows, cols int) [][]float64 {
 }
 
 func (A *Matrix) T() *Matrix {
-	t := make([]float64, len(A.data))
-	for row := 0; row < A.rows; row++ {
-		for col := 0; col < A.cols; col++ {
-			t[col*A.rows+row] = A.data[row*A.cols+col]
+	t := make([]float64, len(A.Data))
+	for row := 0; row < A.Rows; row++ {
+		for col := 0; col < A.Cols; col++ {
+			t[col*A.Rows+row] = A.Data[row*A.Cols+col]
 		}
 	}
-	return NewMatrixF(t, A.cols, A.rows)
+	return NewMatrixF(t, A.Cols, A.Rows)
 }

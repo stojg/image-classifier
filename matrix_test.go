@@ -20,15 +20,6 @@ func TestNewMatrix(t *testing.T) {
 	}
 }
 
-func TestNewVector(t *testing.T) {
-	input := []float64{1, 4, 7, 345}
-	m := NewVector(input)
-	rows := m.Len()
-	if rows != 4 {
-		t.Errorf("expected correct dims")
-	}
-}
-
 func TestMatrixAt(t *testing.T) {
 	m := NewMatrix([][]float64{
 		[]float64{0, 1},
@@ -63,39 +54,6 @@ func TestMatrixMin(t *testing.T) {
 	if A.Min() != -4 {
 		t.Errorf("could not find max in Matrix, got %f", A.Min())
 	}
-}
-
-func TestMatrixMulVector(t *testing.T) {
-	M := NewMatrix([][]float64{
-		[]float64{1, 2, 3},
-		[]float64{4, 5, 6},
-	})
-
-	v := NewVector([]float64{1, 2, 3})
-
-	expected := NewMatrix([][]float64{
-		[]float64{1*1 + 2*2 + 3*3},
-		[]float64{4*1 + 5*2 + 6*3},
-	})
-
-	actual := M.MulVec(v)
-
-	if !actual.Equals(expected) {
-		t.Errorf("Not the same")
-	}
-}
-
-func BenchmarkMatrixMulVector(b *testing.B) {
-	M := NewMatrix([][]float64{
-		[]float64{1, 2, 3},
-		[]float64{4, 5, 6},
-	})
-	v := NewVector([]float64{1, 2, 3})
-	var actual *Matrix
-	for i := 0; i < b.N; i++ {
-		actual = M.MulVec(v)
-	}
-	bResult = actual
 }
 
 var matrixMulTestTable = [][][][]float64{
@@ -312,6 +270,36 @@ func BenchmarkMatrixAdd(b *testing.B) {
 	var actual *Matrix
 	for i := 0; i < b.N; i++ {
 		actual = A.Add(B)
+	}
+	bResult = actual
+}
+
+func TestMatrixColSum(t *testing.T) {
+	A := NewMatrix([][]float64{
+		[]float64{1, 2, 3},
+		[]float64{4, 5, 6},
+	})
+	B := NewMatrix([][]float64{
+		[]float64{5, 7, 9},
+	})
+
+	actual := A.ColSum()
+
+	if !actual.Equals(B) {
+		t.Errorf("The result of A.ColSum() was not as expected")
+	}
+}
+
+
+func BenchmarkMatrixColSum(b *testing.B) {
+	A := NewMatrix([][]float64{
+		[]float64{1, 2, 3},
+		[]float64{4, 5, 6},
+	})
+
+	var actual *Matrix
+	for i := 0; i < b.N; i++ {
+		actual = A.ColSum()
 	}
 	bResult = actual
 }
