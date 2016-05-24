@@ -7,7 +7,7 @@ import (
 type Normaliser struct {
 }
 
-func (n *Normaliser) Normalise(input [][]float64) [][]float64 {
+func (n *Normaliser) StdDev(input [][]float64) [][]float64 {
 	br := n.transpose(input)
 	var resultX [][]float64
 	for i := range br {

@@ -54,7 +54,7 @@ func TestNormalising(t *testing.T) {
 		[]float64{1, 1, 1},
 	}
 
-	actual := norm.Normalise(input)
+	actual := norm.StdDev(input)
 
 	if len(actual) != len(expected) {
 		t.Errorf("wanted actual to be the same length as output, wanted %d, got %d", len(expected), len(actual))
@@ -88,7 +88,7 @@ func TestNormalisingNoVariance(t *testing.T) {
 		[]float64{0},
 	}
 
-	actual := norm.Normalise(input)
+	actual := norm.StdDev(input)
 
 	if len(actual) != len(expected) {
 		t.Errorf("wanted actual to be the same length as output, wanted %d, got %d", len(expected), len(actual))

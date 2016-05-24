@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"math/rand"
+	"time"
 )
 
 func main() {
@@ -11,56 +13,45 @@ func main() {
 		panic(err)
 	}
 
+	rand.Seed(time.Now().UTC().UnixNano())
+	//rand.Seed(0)
+
+	for i := range trainingX {
+		j := rand.Intn(i + 1)
+		trainingX[i], trainingX[j] = trainingX[j], trainingX[i]
+		trainingY[i], trainingY[j] = trainingY[j], trainingY[i]
+	}
+
 	log.Printf("normalising data")
 	n := Normaliser{}
 	// this normalises the data into a standard deviation, roughly between -1 to +1 with a guassian distribution
-	trX := n.Normalise(trainingX)
-	trY := trainingY
-	//teX := n.Normalise(testX[:testLen])
-	//teY := testY[:testLen]
-
+	trX := n.StdDev(trainingX[:150])
+	trY := trainingY[:150]
 	log.Printf("training set size %d", len(trX))
 	log.Printf("training set dimensions X: %d and Y: %d", len(trX[0]), len(trY[0]))
+
+	teX := n.StdDev(trainingX[150:])
+	teY := trainingY[150:]
+	log.Printf("test set size %d", len(teX))
+	log.Printf("test set dimensions X: %d and Y: %d", len(teX[0]), len(teY[0]))
 
 	nn := &NeuralNet{log: true, plot: true}
 
 	log.Printf("training neural net")
 	// train the network with n epochs
-	nn.Train(trX, trY, 10000)
+	nn.Train(trX, trY, 10000, 8)
 
-	//log.Printf("test set size %d", len(teX))
-	//log.Printf("predicting on neural net")
-	//
-	//var correct int
-	//for i := range teX {
-	//	result := nn.Predict(teX[i])
-	//	if teY[i][result[0]] > 0 {
-	//		correct++
-	//	}
-	//}
-	//log.Printf("neural net classifier accuracy: %0.1f%% (%d / %d)", percent(correct, len(teY)), correct, len(teY))
-}
+	log.Printf("test set size %d", len(teX))
+	log.Printf("predicting on neural net")
 
-func junk() {
-	// the image data is downloaded from https://www.cs.toronto.edu/~kriz/cifar.html (binary version) and chucked into
-	// a "data" folder.
-	// 50 000 images
-	//trainingImages := loadCIFAR10("data/data_batch_1*")
-	// 10 000 images
-	//testImages := loadCIFAR10("data/test_batch.bin")
-	//log.Printf("converting image data for classifier")
-
-	// the "images" as converted back into a []float64 for both X (pixeldata) and Y(labels)
-	//trainingX, trainingY := trainingImages.asFloatSlices()
-	//testX, testY := testImages.asFloatSlices()
-	//
-	//if len(trainingX) < 1 || len(testY) < 1 {
-	//	log.Printf("no training or test data found")
-	//	os.Exit(1)
-	//}
-	//
-	//trainingLen := 1000
-	//testLen := 100
+	var correct int
+	for i := range teX {
+		result := nn.Predict(teX[i])
+		if teY[i][result[0]] > 0 {
+			correct++
+		}
+	}
+	log.Printf("neural net classifier accuracy: %0.1f%% (%d / %d)", percent(correct, len(teY)), correct, len(teY))
 }
 
 func percent(a, b int) float64 {

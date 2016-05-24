@@ -6,7 +6,6 @@ import (
 	"log"
 	"math"
 	"math/rand"
-	"time"
 )
 
 type NeuralNet struct {
@@ -19,43 +18,27 @@ type NeuralNet struct {
 	plot     bool
 	lossPlot *gnuplot.Plotter
 	accPlot  *gnuplot.Plotter
+	stepSize float64
+	reg      float64
 }
 
 // @todo print time per epoch
-// @todo mini batch updates
 // @todo add more depth with convnets for image processing
 // @todo use all CPU cores
 // @todo link with a proper C lib for faster linear algebra (e.g. https://github.com/gonum/blas)
-func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs int) {
+func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs, numBatches int) {
 
-	const (
-		reg      = 1e-3
-		stepSize = 0.001
-	)
-
-	log.Printf("Randomising training data")
-	for i := range xIn {
-		j := rand.Intn(i + 1)
-		xIn[i], xIn[j] = xIn[j], xIn[i]
-		yIn[i], yIn[j] = yIn[j], yIn[i]
-	}
+	t.reg = 1e-3
+	t.stepSize = 0.001
 
 	// setup gnuplots
 	t.initPlots()
 	defer t.lossPlot.Close()
 	defer t.accPlot.Close()
 
-	// use 10% of the test data for prediction, so we can check if we are over fitting the net, this
-	// data is not used to train the net.
-	x, y, xPred, yPred := t.divide(10, xIn, yIn)
-
-	// bog standard seed of psuedo random generator, set to a fixed number to have a determistic
-	// starting point
-	rand.Seed(time.Now().UTC().UnixNano())
-
 	inputNeurons := len(xIn[0])
-	hiddenNeurons := 26
-	outputNeurons := len(y[0])
+	hiddenNeurons := 36
+	outputNeurons := len(yIn[0])
 
 	// Put up a checkpoint so we can check that the data and loss is set up correctly
 	if t.log {
@@ -63,12 +46,12 @@ func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs int) {
 	}
 
 	// initialize parameters (weights) randomly for input -> hidden layer
-	W1 := NewRandomMatrix(inputNeurons, hiddenNeurons).ScalarMul(0.01)
-	bias1 := NewRandomMatrix(1, hiddenNeurons).ScalarMul(0.01)
+	t.W1 = NewRandomMatrix(inputNeurons, hiddenNeurons).ScalarMul(0.01)
+	t.bias1 = NewRandomMatrix(1, hiddenNeurons).ScalarMul(0.01)
 
 	// initialize parameters (weights) randomly for hidden-> output layer
-	W2 := NewRandomMatrix(hiddenNeurons, outputNeurons).ScalarMul(0.01)
-	bias2 := NewRandomMatrix(1, outputNeurons).ScalarMul(0.01)
+	t.W2 = NewRandomMatrix(hiddenNeurons, outputNeurons).ScalarMul(0.01)
+	t.bias2 = NewRandomMatrix(1, outputNeurons).ScalarMul(0.01)
 
 	// keep a running tally of the score between hidden -> output so that we can print
 	// it after the epoch loop
@@ -81,88 +64,122 @@ func (t *NeuralNet) Train(xIn [][]float64, yIn [][]byte, numEpochs int) {
 		pAccuracies []float64
 	)
 
+	xAll, yAll, xPred, yPred := t.divide(10, xIn, yIn)
+
 	// The training loop
 	for epoch := 0; epoch < numEpochs; epoch++ {
 
-		// evaluate input -> hidden
-		hiddenLayer := t.ReLu(x.Dot(W1).RowAdd(bias1))
-		// final output layer "scores", note that there we don't need a ReLU activation
-		outputLayer = hiddenLayer.Dot(W2).RowAdd(bias2)
+		xBatches, yBatches := t.getBatches(numBatches, xAll, yAll)
 
-		// loss
-		loss := t.softMaxLoss(outputLayer, W1, y, reg)
-		acc := t.accuracy(outputLayer, y) * 100
+		dW1 := NewZerosMatrix(t.W1.rows, t.W1.cols)
+		dBias1 := NewZerosMatrix(t.bias1.rows, t.bias1.cols)
+		dW2 := NewZerosMatrix(t.W2.rows, t.W2.cols)
+		dBias2 := NewZerosMatrix(t.bias2.rows, t.bias2.cols)
+
+		for i := range xBatches {
+			a, b, c, d := t.GradientDescent(xBatches[i], yBatches[i])
+			dW1 = dW1.Add(a)
+			dBias1 = dBias1.Add(b)
+			dW2 = dW2.Add(c)
+			dBias2 = dBias2.Add(d)
+		}
+
+		// parameter update
+		t.W2 = t.W2.Sub(dW2.ScalarMul(t.stepSize))
+		t.bias2 = t.bias2.Sub(dBias2.ScalarMul(t.stepSize))
+
+		// parameter update
+		t.W1 = t.W1.Sub(dW1.ScalarMul(t.stepSize))
+		t.bias1 = t.bias1.Sub(dBias1.ScalarMul(t.stepSize))
+
+		// calculate loss
+		hiddenLayer := t.ReLu(NewMatrix(xAll).Dot(t.W1).RowAdd(t.bias1))
+		outputLayer = hiddenLayer.Dot(t.W2).RowAdd(t.bias2)
+		loss := t.softMaxLoss(outputLayer, t.W1, yAll, t.reg)
+		trainingError := t.error(outputLayer, yAll) * 100
 
 		// calculate how well we can predict
-		pred := t.ReLu(xPred.Dot(W1).RowAdd(bias1))
-		predAcc := t.accuracy(pred.Dot(W2).RowAdd(bias2), yPred) * 100
+		pHiddenLayer := t.ReLu(NewMatrix(xPred).Dot(t.W1).RowAdd(t.bias1))
+		pOutputLayer := pHiddenLayer.Dot(t.W2).RowAdd(t.bias2)
+		predictionError := t.error(pOutputLayer, yPred) * 100
 
 		if t.plot {
 			losses = append(losses, loss)
-			accuracies = append(accuracies, acc)
-			pAccuracies = append(pAccuracies, predAcc)
+			accuracies = append(accuracies, trainingError)
+			pAccuracies = append(pAccuracies, predictionError)
 		}
 
-		if t.log && epoch%100 == 0 {
-			log.Printf("epoch %d:  loss: %f,  accuracy %.1f%% / %.1f%%", epoch, loss, acc, predAcc)
+		if t.log && epoch%500 == 0 {
+			log.Printf("epoch %d:  loss: %f,  error %.1f%%/%.1f%%", epoch, loss, trainingError, predictionError)
 			if t.plot {
 				t.plotProgress(losses, accuracies, pAccuracies)
 			}
 		}
-
-		// Start the backward propagation
-		grad := t.softMaxGradient(outputLayer, y)
-
-		dW2 := hiddenLayer.T().Dot(grad)
-		db2 := grad.ColSum()
-
-		dHidden := grad.Dot(W2.T())
-		t.ReLuBackProp(dHidden, hiddenLayer)
-
-		dW1 := x.T().Dot(dHidden)
-		db1 := dHidden.ColSum()
-
-		// add regularisation
-		dW2 = dW2.Add(W2.ScalarMul(reg))
-		dW1 =  dW1.Add(W1.ScalarMul(reg))
-
-		// parameter update
-		W2 = W2.Sub(dW2.ScalarMul(stepSize))
-		bias2 = bias2.Sub(db2.ScalarMul(stepSize))
-
-		// parameter update
-		W1 = W1.Sub(dW1.ScalarMul(stepSize))
-		bias1 = bias1.Sub(db1.ScalarMul(stepSize))
 	}
-
 	t.plotProgress(losses, accuracies, pAccuracies)
-
-	// "close" the gnuplots
-	t.lossPlot.Cmd("q")
-	t.accPlot.Cmd("q")
-
-	// save the final values so that Predict() can find them
-	t.W2 = W2
-	t.bias2 = bias2
-	t.W1 = W1
-	t.bias1 = bias1
-
-	if t.log {
-		loss := t.softMaxLoss(outputLayer, W1, y, reg)
-		log.Printf("result: loss: %f, accuracy %.1f%%", loss, t.accuracy(outputLayer, y)*100)
-	}
 }
-
 
 func (t *NeuralNet) Predict(input []float64) []int {
 	// convert into a matrix
 	xTe := NewMatrixF(input, 1, len(input))
 	// evaluate class scores with a 2-layer Neural Network
-	hiddenLayer := xTe.Dot(t.W1).RowAdd(t.bias1).ElementMax(0) // ReLU activation
+	hiddenLayer := t.ReLu(xTe.Dot(t.W1).RowAdd(t.bias1))
 	scores := hiddenLayer.Dot(t.W2).RowAdd(t.bias2)
 	return scores.ArgMax()
 }
 
+func (t *NeuralNet) getBatches(batchSize int, xAll [][]float64, yAll [][]byte) ([]*Matrix, [][][]byte) {
+	for i := range xAll {
+		j := rand.Intn(i + 1)
+		xAll[i], xAll[j] = xAll[j], xAll[i]
+		yAll[i], yAll[j] = yAll[j], yAll[i]
+	}
+
+	xBatch := make([][][]float64, batchSize)
+	yBatch := make([][][]byte, batchSize)
+
+	for i := range xAll {
+		bIdx := rand.Intn(batchSize)
+		xBatch[bIdx] = append(xBatch[bIdx], xAll[i])
+		yBatch[bIdx] = append(yBatch[bIdx], yAll[i])
+	}
+
+	var X []*Matrix
+	for i := range xBatch {
+		if len(xBatch[i]) == 0 {
+			continue
+		}
+		X = append(X, NewMatrix(xBatch[i]))
+	}
+
+	return X, yBatch
+}
+
+func (t *NeuralNet) GradientDescent(x *Matrix, y [][]byte) (*Matrix, *Matrix, *Matrix, *Matrix) {
+
+	// evaluate input -> hidden
+	hiddenLayer := t.ReLu(x.Dot(t.W1).RowAdd(t.bias1))
+	// final output layer "scores", note that there we don't need a ReLU activation
+	outputLayer := hiddenLayer.Dot(t.W2).RowAdd(t.bias2)
+
+	// Start the backward propagation
+	grad := t.softMaxGradient(outputLayer, y)
+
+	dW2 := hiddenLayer.T().Dot(grad)
+	db2 := grad.ColSum()
+
+	dHidden := grad.Dot(t.W2.T())
+	t.ReLuBackProp(dHidden, hiddenLayer)
+
+	dW1 := x.T().Dot(dHidden)
+	db1 := dHidden.ColSum()
+
+	// add regularisation
+	dW2 = dW2.Add(t.W2.ScalarMul(t.reg))
+	dW1 = dW1.Add(t.W1.ScalarMul(t.reg))
+
+	return dW1, db1, dW2, db2
+}
 
 func (t *NeuralNet) plotProgress(losses, acc, pacc []float64) {
 	t.lossPlot.ResetPlot()
@@ -189,7 +206,6 @@ func (t *NeuralNet) softMaxLoss(a2, theta1 *Matrix, y [][]byte, reg float64) flo
 	regLoss := 0.5 * reg * theta1.ElementMul(theta1).Sum()
 	return dataLoss + regLoss
 }
-
 
 func (t *NeuralNet) softMaxGradient(A *Matrix, y [][]byte) *Matrix {
 	// find the gradient descent for output
@@ -245,7 +261,7 @@ func (t *NeuralNet) initPlots() {
 	}
 	accPlot.SetStyle("lines")
 	accPlot.SetXLabel("epoch")
-	accPlot.SetYLabel("accuracy %")
+	accPlot.SetYLabel("error %")
 	accPlot.Cmd("set yrange [0:110]")
 
 	t.lossPlot = lossPlot
@@ -254,7 +270,7 @@ func (t *NeuralNet) initPlots() {
 
 // accuracy returns a accuracy between 0.0 - 1.0 on how correct a score (classification)
 // matrix is compared to the actual (Y) labels
-func (t *NeuralNet) accuracy(scores *Matrix, y [][]byte) float64 {
+func (t *NeuralNet) error(scores *Matrix, y [][]byte) float64 {
 	actual := scores.ArgMax()
 	correct := 0.0
 	for i := range actual {
@@ -262,14 +278,14 @@ func (t *NeuralNet) accuracy(scores *Matrix, y [][]byte) float64 {
 			correct += 1
 		}
 	}
-	return correct / float64(len(y))
+	return 1 - (correct / float64(len(y)))
 }
 
-func (t *NeuralNet) divide(percent int, xIn [][]float64, yIn [][]byte) (*Matrix, [][]byte, *Matrix, [][]byte) {
+func (t *NeuralNet) divide(percent int, xIn [][]float64, yIn [][]byte) ([][]float64, [][]byte, [][]float64, [][]byte) {
 	predictionLength := int(math.Floor(float64(len(xIn)) / float64(percent)))
-	x := t.makeMatrix(xIn[:len(xIn)-predictionLength])
+	x := xIn[:len(xIn)-predictionLength]
 	y := yIn[:len(xIn)-predictionLength]
-	xPred := t.makeMatrix(xIn[len(xIn)-predictionLength:])
+	xPred := xIn[len(xIn)-predictionLength:]
 	yPred := yIn[len(xIn)-predictionLength:]
 	return x, y, xPred, yPred
 }
