@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-func wineLoader(file string) ([][]float64, [][]byte, error) {
+func wineLoader(file string) ([][]float64, [][]float64, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, nil, err
@@ -17,7 +17,7 @@ func wineLoader(file string) ([][]float64, [][]byte, error) {
 	csvr := csv.NewReader(f)
 
 	var data [][]float64
-	var classes [][]byte
+	var classes [][]float64
 	for {
 		row, err := csvr.Read()
 		if err != nil {
@@ -27,7 +27,7 @@ func wineLoader(file string) ([][]float64, [][]byte, error) {
 			return data, classes, err
 		}
 
-		class := make([]byte, 3)
+		class := make([]float64, 3)
 		var classVal float64
 		if classVal, err = strconv.ParseFloat(row[0], 64); err != nil {
 			return data, classes, err

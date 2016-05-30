@@ -13,13 +13,13 @@ import (
 // ImageSet is an collection of CIFAR10Images
 type ImageSet []CIFAR10Image
 
-func (c ImageSet) asFloatSlices() ([][]float64, [][]byte) {
+func (c ImageSet) asFloatSlices() ([][]float64, [][]float64) {
 	x := make([][]float64, len(c))
-	y := make([][]byte, len(c))
+	y := make([][]float64, len(c))
 	for i := 0; i < len(c); i++ {
 		x[i] = make([]float64, len(c[i].raw))
 		copy(x[i], c[i].raw)
-		y[i] = make([]byte, 10)
+		y[i] = make([]float64, 10)
 		if c[i].label == 0 {
 		}
 		y[i][c[i].label] = 1.0
@@ -27,7 +27,7 @@ func (c ImageSet) asFloatSlices() ([][]float64, [][]byte) {
 	return x, y
 }
 
-func cifar10Loader(pattern string) ([][]float64, [][]byte, error) {
+func cifar10Loader(pattern string) ([][]float64, [][]float64, error) {
 	var set = make(ImageSet, 0)
 	trainingFiles, err := filepath.Glob(pattern)
 	if err != nil {

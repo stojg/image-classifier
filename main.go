@@ -10,6 +10,7 @@ import (
 
 func main() {
 
+	//trainingX, trainingY, err := cifar10Loader("data/data_batch_1*")
 	trainingX, trainingY, err := wineLoader("testdata/wine.data")
 	if err != nil {
 		panic(err)
@@ -24,36 +25,52 @@ func main() {
 		trainingY[i], trainingY[j] = trainingY[j], trainingY[i]
 	}
 
+	// 80% goes to the training
+	trainingSize := int(float64(len(trainingX)) * 0.8)
 	log.Printf("normalising data")
 	n := Normaliser{}
 	// this normalises the data into a standard deviation, roughly between -1 to +1 with a guassian distribution
-	trX := n.StdDev(trainingX[:150])
-	trY := trainingY[:150]
-	log.Printf("training set size %d", len(trX))
-	log.Printf("training set dimensions X: %d and Y: %d", len(trX[0]), len(trY[0]))
+	trX := n.StdDev(trainingX[:trainingSize])
+	trY := trainingY[:trainingSize]
+	log.Printf("training set contains %d examples of dimensions X: %d and Y: %d", len(trX), len(trX[0]), len(trY[0]))
 
-	teX := n.StdDev(trainingX[150:])
-	teY := trainingY[150:]
-	log.Printf("test set size %d", len(teX))
-	log.Printf("test set dimensions X: %d and Y: %d", len(teX[0]), len(teY[0]))
+	teX := n.StdDev(trainingX[trainingSize:])
+	teY := trainingY[trainingSize:]
+	log.Printf("test set contains %d examples of dimensions X: %d and Y: %d", len(teX), len(teX[0]), len(teY[0]))
 
-	nn := &NeuralNet{log: true, plot: true}
+	nn := &NeuralNet{
+		log:    true,
+		plot:   true,
+		lambda: 0.01,
+		alpha:  0.001,
+	}
 
 	log.Printf("training neural net")
 	// train the network with n epochs
-	nn.Train(trX, trY, 5000, 8, 10)
+	trainingError, cvError := nn.Train(trX, trY, 40, 5000, 8)
 
-	log.Printf("test set size %d", len(teX))
-	log.Printf("predicting on neural net")
+	log.Printf("errors:")
+	log.Printf("\ttraining\t%0.5f", trainingError)
+	log.Printf("\tvalidation\t%0.5f", cvError)
 
 	var correct int
+	for i := range trX {
+		result := nn.Predict(trX[i])
+		if trY[i][result[0]] > 0 {
+			correct++
+		}
+	}
+	log.Printf("training accuracy: %0.1f%% (%d / %d)", percent(correct, len(trY)), correct, len(trY))
+
+	correct = 0
 	for i := range teX {
 		result := nn.Predict(teX[i])
 		if teY[i][result[0]] > 0 {
 			correct++
 		}
 	}
-	log.Printf("neural net classifier accuracy: %0.1f%% (%d / %d)", percent(correct, len(teY)), correct, len(teY))
+	log.Printf("test accuracy: %0.1f%% (%d / %d)", percent(correct, len(teY)), correct, len(teY))
+
 	Save("wine.dat", nn)
 }
 

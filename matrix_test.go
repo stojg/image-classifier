@@ -87,7 +87,21 @@ var matrixMulTestTable = [][][][]float64{
 	},
 }
 
-func TestMatrixMul(t *testing.T) {
+func TestMatrixSDot(t *testing.T) {
+	for _, test := range matrixMulTestTable {
+		A := NewMatrix(test[0])
+		B := NewMatrix(test[1])
+		expected := NewMatrix(test[2])
+		actual := A.SDot(B)
+		if !actual.Equals(expected) {
+			t.Errorf("actual is not the same as expected")
+			actual.Print()
+			expected.Print()
+		}
+	}
+}
+
+func TestMatrixDot(t *testing.T) {
 	for _, test := range matrixMulTestTable {
 		A := NewMatrix(test[0])
 		B := NewMatrix(test[1])
@@ -101,17 +115,27 @@ func TestMatrixMul(t *testing.T) {
 	}
 }
 
-func BenchmarkMatrixMul(b *testing.B) {
-	A := NewMatrix([][]float64{
-		[]float64{1, 2, 3},
-		[]float64{4, 5, 6},
-	})
+func BenchmarkMatrixSDot(b *testing.B) {
+	aD := getMatrixData(256, 128)
+	A := NewMatrixF(aD, 256, 128)
 
-	B := NewMatrix([][]float64{
-		[]float64{7, 8},
-		[]float64{9, 10},
-		[]float64{11, 12},
-	})
+	bD := getMatrixData(128, 256)
+	B := NewMatrixF(bD, 128, 256)
+
+	var actual *Matrix
+	for i := 0; i < b.N; i++ {
+		actual = A.SDot(B)
+	}
+	bResult = actual
+}
+
+func BenchmarkMatrixDot(b *testing.B) {
+	aD := getMatrixData(256, 128)
+	A := NewMatrixF(aD, 256, 128)
+
+	bD := getMatrixData(128, 256)
+	B := NewMatrixF(bD, 128, 256)
+
 	var actual *Matrix
 	for i := 0; i < b.N; i++ {
 		actual = A.Dot(B)
@@ -193,6 +217,18 @@ func TestSubScalar(t *testing.T) {
 		t.Errorf("Matrix.SubScalar() failed")
 		A.ScalarSub(5).Print()
 	}
+}
+
+func BenchmarkMatrixTranspose(b *testing.B) {
+
+	aD := getMatrixData(256, 128)
+	A := NewMatrixF(aD, 256, 128)
+
+	var actual *Matrix
+	for i := 0; i < b.N; i++ {
+		actual = A.T()
+	}
+	bResult = actual
 }
 
 func TestMatrixTranspose(t *testing.T) {
@@ -301,4 +337,94 @@ func BenchmarkMatrixColSum(b *testing.B) {
 		actual = A.ColSum()
 	}
 	bResult = actual
+}
+
+func TestAddBias(t *testing.T) {
+	A := NewMatrix([][]float64{
+		[]float64{2, 3, 4, 5},
+		[]float64{6, 7, 8, 9},
+		[]float64{10, 11, 12, 13},
+	})
+	expected := NewMatrix([][]float64{
+		[]float64{1, 2, 3, 4, 5},
+		[]float64{1, 6, 7, 8, 9},
+		[]float64{1, 10, 11, 12, 13},
+	})
+	actual := A.AddBias()
+	if !actual.Equals(expected) {
+		t.Errorf("A is not the same as expected")
+		actual.Print()
+		expected.Print()
+	}
+}
+
+func BenchmarkAddBias(b *testing.B) {
+	aD := getMatrixData(256, 128)
+	A := NewMatrixF(aD, 256, 128)
+	var actual *Matrix
+	for i := 0; i < b.N; i++ {
+		actual = A.AddBias()
+	}
+	bResult = actual
+}
+
+func TestRemoveBias(t *testing.T) {
+	A := NewMatrix([][]float64{
+		[]float64{1, 2, 3, 4, 5},
+		[]float64{1, 6, 7, 8, 9},
+		[]float64{1, 10, 11, 12, 13},
+	})
+	expected := NewMatrix([][]float64{
+		[]float64{2, 3, 4, 5},
+		[]float64{6, 7, 8, 9},
+		[]float64{10, 11, 12, 13},
+	})
+	actual := A.RemoveBias()
+	if !actual.Equals(expected) {
+		t.Errorf("A is not the same as expected")
+		actual.Print()
+		expected.Print()
+	}
+}
+
+func TestZeroBias(t *testing.T) {
+	A := NewMatrix([][]float64{
+		[]float64{1, 2, 3, 4, 5},
+		[]float64{1, 6, 7, 8, 9},
+		[]float64{1, 10, 11, 12, 13},
+	})
+	expected := NewMatrix([][]float64{
+		[]float64{0, 2, 3, 4, 5},
+		[]float64{0, 6, 7, 8, 9},
+		[]float64{0, 10, 11, 12, 13},
+	})
+	actual := A.ZeroBias()
+	if !actual.Equals(expected) {
+		t.Errorf("A is not the same as expected")
+		actual.Print()
+		expected.Print()
+	}
+}
+
+func BenchmarkRemoveBias(b *testing.B) {
+	aD := getMatrixData(256, 128)
+	A := NewMatrixF(aD, 256, 128)
+	var actual *Matrix
+	for i := 0; i < b.N; i++ {
+		actual = A.RemoveBias()
+	}
+	bResult = actual
+}
+
+func getMatrixData(rows, cols int) []float64 {
+	aD := make([]float64, rows*cols)
+	aNum := 0.1
+	for i := 0; i < rows*cols; i++ {
+		aD[i] = aNum
+		if aNum > 1000 {
+			aNum = 0
+		}
+		aNum += 1
+	}
+	return aD
 }

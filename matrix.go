@@ -34,12 +34,12 @@ func NewRandomMatrix(rows, cols int) *Matrix {
 	return NewMatrixF(t, rows, cols)
 }
 
-func NewZerosMatrix(rows, cols int) *Matrix {
+func NewZeros(rows, cols int) *Matrix {
 	t := make([]float64, cols*rows)
 	return NewMatrixF(t, rows, cols)
 }
 
-func NewOnesMatrix(rows, cols int) *Matrix {
+func NewOnes(rows, cols int) *Matrix {
 	t := make([]float64, cols*rows)
 	for i := range t {
 		t[i] = 1
@@ -78,31 +78,74 @@ func (A *Matrix) At(row, col int) float64 {
 	return A.Data[row*A.Cols+col]
 }
 
-func (A *Matrix) Dot(B *Matrix) *Matrix {
+// SDot is Dot implementation that is faster on very small matrices
+func (A *Matrix) SDot(B *Matrix) *Matrix {
 	if A.Cols != B.Rows {
-		panic(fmt.Sprintf("matrix.Mul() A.cols (%d) != B.rows (%d)", A.Cols, B.Rows))
+		panic(fmt.Sprintf("matrix.Mul() A (%d X %d) * B (%d X %d)", A.Rows, A.Cols, B.Rows, B.Cols))
 	}
 
-	aRows := A.Rows
-	aCols := A.Cols
-	bCols := B.Cols
+	result := make([]float64, A.Rows*B.Cols)
+	row := make([]float64, A.Cols)
 
-	result := make([]float64, aRows*bCols)
-	row := make([]float64, aCols)
-
-	for r := 0; r < aRows; r++ {
+	for r := 0; r < A.Rows; r++ {
 		for col := range row {
-			row[col] = A.Data[r*aCols+col]
+			row[col] = A.Data[r*A.Cols+col]
 		}
-		for c := 0; c < bCols; c++ {
+		for c := 0; c < B.Cols; c++ {
 			var v float64
 			for i, e := range row {
-				v += e * B.Data[i*bCols+c]
+				v += e * B.Data[i*B.Cols+c]
 			}
-			result[r*bCols+c] = v
+			result[r*B.Cols+c] = v
 		}
 	}
-	return NewMatrixF(result, aRows, bCols)
+	return NewMatrixF(result, A.Rows, B.Cols)
+}
+
+func (A *Matrix) Dot(B *Matrix) *Matrix {
+	if A.Cols != B.Rows {
+		panic(fmt.Sprintf("matrix.Mul() A (%d X %d) * B (%d X %d)", A.Rows, A.Cols, B.Rows, B.Cols))
+	}
+
+	result := make([]float64, A.Rows*B.Cols)
+
+	in := make(chan int)
+	quit := make(chan bool)
+
+	dotRowCol := func() {
+		for {
+			select {
+			case i := <-in:
+				sums := make([]float64, B.Cols)
+				for k := 0; k < A.Cols; k++ {
+					for j := 0; j < B.Cols; j++ {
+						sums[j] += A.Data[i*A.Cols+k] * B.Data[k*B.Cols+j]
+					}
+				}
+				for j := 0; j < B.Cols; j++ {
+					result[i*B.Cols+j] = sums[j]
+				}
+			case <-quit:
+				return
+			}
+		}
+	}
+
+	threads := 2
+
+	for i := 0; i < threads; i++ {
+		go dotRowCol()
+	}
+
+	for i := 0; i < A.Rows; i++ {
+		in <- i
+	}
+
+	for i := 0; i < threads; i++ {
+		quit <- true
+	}
+
+	return NewMatrixF(result, A.Rows, B.Cols)
 }
 
 func (A *Matrix) RowAdd(B *Matrix) *Matrix {
@@ -234,6 +277,22 @@ func (A *Matrix) ElementMax(max float64) *Matrix {
 	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
+func (A *Matrix) ElementSquare() *Matrix {
+	res := make([]float64, len(A.Data))
+	for i := range res {
+		res[i] = A.Data[i] * A.Data[i]
+	}
+	return NewMatrixF(res, A.Rows, A.Cols)
+}
+
+func (A *Matrix) ElementLog() *Matrix {
+	res := make([]float64, len(A.Data))
+	for i := range res {
+		res[i] = math.Log(A.Data[i])
+	}
+	return NewMatrixF(res, A.Rows, A.Cols)
+}
+
 func (A *Matrix) Min() float64 {
 	max := math.Inf(1)
 	for _, val := range A.Data {
@@ -252,6 +311,12 @@ func (A *Matrix) Sum() float64 {
 	return sum
 }
 
+func (A *Matrix) Row(i int) *Matrix {
+	res := make([]float64, A.Cols)
+	copy(res, A.Data[i*A.Rows:i*A.Rows+A.Cols])
+	return NewMatrixF(res, 1, A.Cols)
+}
+
 func (A *Matrix) ElementMul(B *Matrix) *Matrix {
 	res := make([]float64, len(A.Data))
 	for i := range A.Data {
@@ -260,7 +325,7 @@ func (A *Matrix) ElementMul(B *Matrix) *Matrix {
 	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
-func (A *Matrix) RowFinder(y [][]byte) *Matrix {
+func (A *Matrix) RowFinder(y [][]float64) *Matrix {
 
 	rows := len(y)
 	result := make([]float64, rows)
@@ -308,7 +373,7 @@ func (A *Matrix) ScalarDiv(val float64) *Matrix {
 	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
-func (A *Matrix) ScalarExp() *Matrix {
+func (A *Matrix) ElementExp() *Matrix {
 	res := make([]float64, len(A.Data))
 	for i := range res {
 		res[i] = math.Exp(A.Data[i])
@@ -316,7 +381,7 @@ func (A *Matrix) ScalarExp() *Matrix {
 	return NewMatrixF(res, A.Rows, A.Cols)
 }
 
-func (A *Matrix) ScalarMinusLog() *Matrix {
+func (A *Matrix) ElementMinusLog() *Matrix {
 	res := make([]float64, len(A.Data))
 	for i := range res {
 		res[i] = -math.Log(A.Data[i])
@@ -342,6 +407,39 @@ func (A *Matrix) AbsSum() float64 {
 	return sum
 }
 
+func (A *Matrix) AddBias() *Matrix {
+	res := make([]float64, A.Rows*A.Cols+A.Rows)
+
+	for row := 0; row < A.Rows; row++ {
+		stride := row*A.Cols + 1
+		fromStride := stride - 1
+		length := A.Cols
+		copy(res[stride+row:stride+length+row], A.Data[fromStride:fromStride+length])
+		res[row*A.Cols+row] = 1
+	}
+	return NewMatrixF(res, A.Rows, A.Cols+1)
+}
+
+func (A *Matrix) RemoveBias() *Matrix {
+	res := make([]float64, A.Rows*A.Cols-A.Rows)
+
+	for row := 0; row < A.Rows; row++ {
+		stride := row * A.Cols
+		fromStride := stride + 1
+		length := A.Cols - 1
+		copy(res[stride-row:stride+length-row], A.Data[fromStride:fromStride+length])
+	}
+	return NewMatrixF(res, A.Rows, A.Cols-1)
+}
+
+func (A *Matrix) ZeroBias() *Matrix {
+	res := A.Clone()
+	for i := 0; i < A.Rows; i++ {
+		res.Data[i*A.Cols] = 0
+	}
+	return res
+}
+
 func (A *Matrix) Print() {
 	fmt.Printf("--- %d X %d ---\n[", A.Rows, A.Cols)
 
@@ -359,7 +457,7 @@ func (A *Matrix) Print() {
 }
 
 func (A *Matrix) PrintSize() {
-	fmt.Printf("--- %d X %d ---\n[", A.Rows, A.Cols)
+	fmt.Printf("--- %d X %d ---\n", A.Rows, A.Cols)
 }
 
 func (A *Matrix) slice(rows, cols int) [][]float64 {
