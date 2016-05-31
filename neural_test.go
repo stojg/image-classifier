@@ -32,7 +32,7 @@ func BenchmarkTrailGradientDescent(b *testing.B) {
 
 	var catch *Matrix
 	for i := 0; i < b.N; i++ {
-		_, catch, _ = neuro.miniBatch(xBatches[0], yBatches[0])
+		_, catch, _ = neuro.costFunction(xBatches[0], yBatches[0])
 	}
 	trailResult = catch
 }
