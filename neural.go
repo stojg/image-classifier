@@ -65,24 +65,19 @@ func (t *NeuralNet) Train(xTr, yTr, xCv, yCv [][]float64) (float64, float64) {
 
 		for i := range xBatches {
 			// calculate each batch in it's own go routine so we utilize as many CPU resources as possible
+			wg.Add(1)
 			go func() {
-				wg.Add(1)
 				_, a, b := t.costFunction(xBatches[i], yBatches[i], t.Lambda)
 				aChan <- a
 				bChan <- b
 			}()
-		}
-
-		// drain the cost function results
-		go func() {
-			for range xBatches {
+			// drain each batch in it's own go routine
+			go func() {
 				dW1 = dW1.Add(<-aChan)
 				dW2 = dW2.Add(<-bChan)
 				wg.Done()
-			}
-		}()
-
-		// wait for all calculated gradients
+			}()
+		}
 		wg.Wait()
 
 		// parameter updates
