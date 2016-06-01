@@ -20,7 +20,6 @@ type NeuralNet struct {
 	log           bool
 	plot          bool
 	costPlot      *gnuplot.Plotter
-	accPlot       *gnuplot.Plotter
 }
 
 // @todo add more depth with convnets for image processing
@@ -31,7 +30,6 @@ func (t *NeuralNet) Train(xTr, yTr, xCv, yCv [][]float64) (float64, float64) {
 	if t.plot {
 		t.initPlots()
 		defer t.costPlot.Close()
-		defer t.accPlot.Close()
 	}
 
 	inputNeurons := len(xTr[0])
