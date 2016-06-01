@@ -74,7 +74,7 @@ func (t *NeuralNet) Train(xTr, yTr, xCv, yCv [][]float64) (float64, float64) {
 		select {
 		case <-ticker.C:
 			if t.log {
-				log.Printf("epoch %d:\t%f\t%f", epoch, trainingCosts[len(trainingCosts)-1], validationCosts[len(trainingCosts)-1])
+				log.Printf("epoch %d:\t%f\t%f", epoch, trainingCosts[len(trainingCosts)-1], validationCosts[len(validationCosts)-1])
 			}
 			if t.plot {
 				t.plotCost(trainingCosts, validationCosts)
