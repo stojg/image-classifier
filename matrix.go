@@ -148,7 +148,7 @@ func (A *Matrix) ArgMax() []int {
 
 func (A *Matrix) Add(B *Matrix) *Matrix {
 	if A.Cols != B.Cols || A.Rows != B.Rows {
-		panic(fmt.Sprintf("matrix.Add() matrices must be the same size, A %dX%d, B %dX%d", A.Rows, A.Cols, B.Rows, B.Cols))
+		panic(fmt.Sprintf("matrix.Add() matrices must be the same size, A: %dX%d, B: %dX%d", A.Rows, A.Cols, B.Rows, B.Cols))
 	}
 	res := make([]float64, len(A.Data))
 	for i := range A.Data {
@@ -159,7 +159,7 @@ func (A *Matrix) Add(B *Matrix) *Matrix {
 
 func (A *Matrix) Sub(B *Matrix) *Matrix {
 	if A.Cols != B.Cols || A.Rows != B.Rows {
-		panic(fmt.Sprintf("matrix.Add() matrices must be the same size"))
+		panic(fmt.Sprintf("matrix.Sub() matrices must be the same size, A: %dX%d, B: %dX%d", A.Rows, A.Cols, B.Rows, B.Cols))
 	}
 	res := make([]float64, len(A.Data))
 	for i := range A.Data {
