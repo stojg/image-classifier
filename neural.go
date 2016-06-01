@@ -14,13 +14,16 @@ type NeuralNet struct {
 	HiddenNeurons int
 	Alpha         float64
 	Lambda        float64
-	W1            *Matrix
-	W2            *Matrix
-	numBatches    int
-	numEpochs     int
-	log           bool
-	plot          bool
-	costPlot      *gnuplot.Plotter
+
+	sync.Mutex
+	W1 *Matrix
+	W2 *Matrix
+
+	numBatches int
+	numEpochs  int
+	log        bool
+	plot       bool
+	costPlot   *gnuplot.Plotter
 }
 
 // @todo add more depth with convnets for image processing
@@ -66,11 +69,11 @@ func (t *NeuralNet) Train(xTr, yTr, xCv, yCv [][]float64) (float64, float64) {
 		for i := range xBatches {
 			// calculate each batch in it's own go routine so we utilize as many CPU resources as possible
 			wg.Add(1)
-			go func() {
-				_, a, b := t.costFunction(xBatches[i], yBatches[i], t.Lambda)
+			go func(idx int) {
+				_, a, b := t.costFunction(xBatches[idx], yBatches[idx], t.Lambda)
 				aChan <- a
 				bChan <- b
-			}()
+			}(i)
 			// drain each batch in it's own go routine
 			go func() {
 				dW1 = dW1.Add(<-aChan)
@@ -142,11 +145,16 @@ func (t *NeuralNet) costFunction(x, y *Matrix, lambda float64) (J float64, gradW
 	gradW1 = NewZeros(t.W1.Rows, t.W1.Cols)
 	gradW2 = NewZeros(t.W2.Rows, t.W2.Cols)
 
+	t.Lock()
+	W1 := t.W1.Clone()
+	W2 := t.W2.Clone()
+	t.Unlock()
+
 	// input
 	a1 := x.AddBias()
-	z2 := a1.Dot(t.W1.T())
+	z2 := a1.Dot(W1.T())
 	a2 := t.sigmoid(z2).AddBias()
-	z3 := a2.Dot(t.W2.T())
+	z3 := a2.Dot(W2.T())
 	a3 := t.sigmoid(z3)
 
 	J1 := y.ScalarMul(-1).ElementMul(a3.ElementLog())
@@ -155,22 +163,22 @@ func (t *NeuralNet) costFunction(x, y *Matrix, lambda float64) (J float64, gradW
 	ones2 := NewOnes(a3.Rows, a3.Cols)
 	J2 := ones1.Sub(y).ElementMul(ones2.Sub(a3).ElementLog())
 
-	Jreg1 := t.W1.RemoveBias().ElementSquare().Sum()
-	Jreg2 := t.W2.RemoveBias().ElementSquare().Sum()
+	Jreg1 := W1.RemoveBias().ElementSquare().Sum()
+	Jreg2 := W2.RemoveBias().ElementSquare().Sum()
 
 	m := float64(x.Rows)
 	J = (J1.Sub(J2).Sum() / m) + (lambda * (Jreg1 + Jreg2) / (2 * m))
 
 	d3 := a3.Sub(y)
-	d2 := d3.Dot(t.W2.RemoveBias()).ElementMul(t.sigmoidPrime(z2))
+	d2 := d3.Dot(W2.RemoveBias()).ElementMul(t.sigmoidPrime(z2))
 
 	gradW1 = d2.T().Dot(a1).ScalarDiv(m)
 	gradW2 = d3.T().Dot(a2).ScalarDiv(m)
 
 	// add regularisation to gradients
 	if lambda != 0 {
-		gradW1Reg := t.W1.ZeroBias().ScalarDiv(lambda / m)
-		gradW2Reg := t.W2.ZeroBias().ScalarDiv(lambda / m)
+		gradW1Reg := W1.ZeroBias().ScalarDiv(lambda / m)
+		gradW2Reg := W2.ZeroBias().ScalarDiv(lambda / m)
 		gradW1.Add(gradW1Reg)
 		gradW2.Add(gradW2Reg)
 	}
