@@ -11,9 +11,7 @@ import (
 func main() {
 
 	rand.Seed(time.Now().UTC().UnixNano())
-	//rand.Seed(0)
 
-	//trainingX, trainingY, err := cifar10Loader("data/data_batch_1*")
 	rawX, rawY, err := wineLoader("testdata/wine.data")
 	if err != nil {
 		panic(err)
@@ -26,47 +24,47 @@ func main() {
 		rawY[i], rawY[j] = rawY[j], rawY[i]
 	}
 
-	// 80% goes to the training
-	trainingSize := int(float64(len(rawX)) * 0.8)
+	// normalise the data into a standard deviation (roughly between -1 to +1) with a gaussian distribution
 	log.Printf("normalising data")
 	n := Normaliser{}
+	normX := n.StdDev(rawX)
 
-	// this normalises the data into a standard deviation, roughly between -1 to +1 with a guassian distribution
-	trX := n.StdDev(rawX[:trainingSize])
+	// 80% goes to the training, 20% to test
+	trainingSize := int(float64(len(rawX)) * 0.8)
+
+	trX := normX[:trainingSize]
 	trY := rawY[:trainingSize]
 	log.Printf("training set contains %d examples of dimensions X: %d and Y: %d", len(trX), len(trX[0]), len(trY[0]))
 
-	teX := n.StdDev(rawX[trainingSize:])
+	teX := normX[trainingSize:]
 	teY := rawY[trainingSize:]
 	log.Printf("test set contains %d examples of dimensions X: %d and Y: %d", len(teX), len(teX[0]), len(teY[0]))
 
 	nn := &NeuralNet{
-		HiddenNeurons: 20,
-		Alpha:         0.001,
-		Lambda:        0.01,
+		HiddenNeurons: 2000,
+		Alpha:         1e-3,
+		Lambda:        1e-3,
 		numBatches:    8,
-		numEpochs:     10000,
-		log:           false,
-		plot:          false,
+		numEpochs:     1000,
+		log:           true,
+		plot:          true,
 	}
 
-	log.Printf("training neural net")
-
+	// divide the training data into 50% training and 50% validation
 	trX, trY, cvX, cvY := nn.Divide(trX, trY)
 
-	// train the network with n epochs
+	log.Printf("training neural net")
 	trainingError, cvError := nn.Train(trX, trY, cvX, cvY)
+	log.Printf("final cost:\t%f\t%f", trainingError, cvError)
 
-	log.Printf("cost:\t%f\t%f", trainingError, cvError)
-
+	// use the learned the net to predict and print the accuracy
 	correct, acc := predict(nn, trX, trY)
 	log.Printf("training accuracy: %0.1f%% (%d / %d)", acc, correct, len(trY))
 	correct, acc = predict(nn, cvX, cvY)
 	log.Printf("validation accuracy: %0.1f%% (%d / %d)", acc, correct, len(cvY))
 	correct, acc = predict(nn, teX, teY)
 	log.Printf("test accuracy: %0.1f%% (%d / %d)", acc, correct, len(teY))
-
-	Save("wine.dat", nn)
+	Save("learned_net.json", nn)
 }
 
 func predict(nn *NeuralNet, trX, trY [][]float64) (int, float64) {
@@ -77,14 +75,11 @@ func predict(nn *NeuralNet, trX, trY [][]float64) (int, float64) {
 			correct++
 		}
 	}
-	return correct, percent(correct, len(trY))
-}
-
-func percent(a, b int) float64 {
-	if b == 0 {
-		return 0
+	var percent float64
+	if correct != 0 {
+		percent = float64(correct) / float64(correct) * 100
 	}
-	return float64(a) / float64(b) * 100
+	return correct, percent
 }
 
 func Save(fileName string, t *NeuralNet) {

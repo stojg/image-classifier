@@ -14,7 +14,7 @@ func TestNewMatrix(t *testing.T) {
 		[]float64{3, 6, 9, 214},
 	}
 	m := NewMatrix(input)
-	rows, cols := m.Dim()
+	rows, cols := m.Rows, m.Cols
 	if rows != 3 && cols != 4 {
 		t.Errorf("expected correct dims")
 	}
@@ -37,22 +37,6 @@ func TestMatrixAt(t *testing.T) {
 	}
 	if m.At(1, 1) != 3 {
 		t.Errorf("fail when trying to get 3, got %.1f", m.At(1, 1))
-	}
-}
-
-func TestMatrixMax(t *testing.T) {
-	A := NewMatrixF([]float64{0, 1, 2, 3, 4, 5, 4, 3, 2, 1}, 5, 2)
-
-	if A.Max() != 5 {
-		t.Errorf("could not find max in Matrix, got %f", A.Max())
-	}
-}
-
-func TestMatrixMin(t *testing.T) {
-	A := NewMatrixF([]float64{5, 4, 3, 2, 1, 0, -4, 3, 1, 56}, 5, 2)
-
-	if A.Min() != -4 {
-		t.Errorf("could not find max in Matrix, got %f", A.Min())
 	}
 }
 
@@ -202,23 +186,6 @@ func TestMatrixSum(t *testing.T) {
 
 }
 
-func TestSubScalar(t *testing.T) {
-	A := NewMatrix([][]float64{
-		[]float64{1, 2, 3},
-		[]float64{4, 5, 6},
-	})
-
-	expected := NewMatrix([][]float64{
-		[]float64{-4, -3, -2},
-		[]float64{-1, 0, 1},
-	})
-
-	if !A.ScalarSub(5).Equals(expected) {
-		t.Errorf("Matrix.SubScalar() failed")
-		A.ScalarSub(5).Print()
-	}
-}
-
 func BenchmarkMatrixTranspose(b *testing.B) {
 
 	aD := getMatrixData(256, 128)
@@ -272,27 +239,6 @@ func TestArgMax(t *testing.T) {
 	}
 }
 
-func TestMatrixColDiv(t *testing.T) {
-	A := NewMatrix([][]float64{
-		[]float64{3, 6, 9},
-		[]float64{10, 8, 16},
-	})
-	B := NewMatrix([][]float64{
-		[]float64{3},
-		[]float64{2},
-	})
-
-	expected := NewMatrix([][]float64{
-		[]float64{1, 2, 3},
-		[]float64{5, 4, 8},
-	})
-
-	actual := A.ColDiv(B)
-	if !actual.Equals(expected) {
-		t.Errorf("not the expected")
-	}
-}
-
 func BenchmarkMatrixAdd(b *testing.B) {
 	A := NewMatrix([][]float64{
 		[]float64{1, 2, 3},
@@ -306,35 +252,6 @@ func BenchmarkMatrixAdd(b *testing.B) {
 	var actual *Matrix
 	for i := 0; i < b.N; i++ {
 		actual = A.Add(B)
-	}
-	bResult = actual
-}
-
-func TestMatrixColSum(t *testing.T) {
-	A := NewMatrix([][]float64{
-		[]float64{1, 2, 3},
-		[]float64{4, 5, 6},
-	})
-	B := NewMatrix([][]float64{
-		[]float64{5, 7, 9},
-	})
-
-	actual := A.ColSum()
-
-	if !actual.Equals(B) {
-		t.Errorf("The result of A.ColSum() was not as expected")
-	}
-}
-
-func BenchmarkMatrixColSum(b *testing.B) {
-	A := NewMatrix([][]float64{
-		[]float64{1, 2, 3},
-		[]float64{4, 5, 6},
-	})
-
-	var actual *Matrix
-	for i := 0; i < b.N; i++ {
-		actual = A.ColSum()
 	}
 	bResult = actual
 }

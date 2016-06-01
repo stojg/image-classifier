@@ -45,8 +45,8 @@ func (t *NeuralNet) Train(xTr, yTr, xCv, yCv [][]float64) (float64, float64) {
 
 	// these are used so that we can update gnuplots with the data
 	var (
-		trainCost      []float64
-		validationCost []float64
+		trainingCosts   []float64
+		validationCosts []float64
 	)
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -65,34 +65,59 @@ func (t *NeuralNet) Train(xTr, yTr, xCv, yCv [][]float64) (float64, float64) {
 		t.W2 = t.W2.Sub(dW2.ScalarMul(t.Alpha))
 		t.W1 = t.W1.Sub(dW1.ScalarMul(t.Alpha))
 
-		Jtrain, _, _ := t.costFunction(NewMatrix(xTr), NewMatrix(yTr), 0)
-		trainCost = append(trainCost, Jtrain)
-		Jvalidation, _, _ := t.costFunction(NewMatrix(xCv), NewMatrix(yCv), 0)
-		validationCost = append(validationCost, Jvalidation)
+		// check the cost for the training set
+		jTrain, _, _ := t.costFunction(NewMatrix(xTr), NewMatrix(yTr), 0)
+		trainingCosts = append(trainingCosts, jTrain)
+
+		// check the cost for the validation set
+		jValidation, _, _ := t.costFunction(NewMatrix(xCv), NewMatrix(yCv), 0)
+		validationCosts = append(validationCosts, jValidation)
 
 		select {
 		case <-ticker.C:
 			if t.log {
-				log.Printf("epoch %d:\t%f\t%f", epoch, trainCost[len(trainCost)-1], validationCost[len(trainCost)-1])
+				log.Printf("epoch %d:\t%f\t%f", epoch, trainingCosts[len(trainingCosts)-1], validationCosts[len(trainingCosts)-1])
 			}
 			if t.plot {
-				t.plotCost(trainCost, validationCost)
+				t.plotCost(trainingCosts, validationCosts)
 			}
 		default:
 		}
 	}
 
 	if t.plot {
-		t.plotCost(trainCost, validationCost)
+		t.plotCost(trainingCosts, validationCosts)
 	}
 
-	return trainCost[len(trainCost)-1], validationCost[len(trainCost)-1]
+	if len(validationCosts) == 0 || len(trainingCosts) == 0 {
+		return math.Inf(-1), math.Inf(-1)
+	}
+	return trainingCosts[len(trainingCosts)-1], validationCosts[len(validationCosts)-1]
 }
 
-func (t *NeuralNet) costFunction(x, y *Matrix, lambda float64) (float64, *Matrix, *Matrix) {
+func (t *NeuralNet) Predict(input []float64) []int {
+	xTe := NewMatrixF(input, 1, len(input))
+	a1 := xTe.AddBias()
+	z2 := a1.Dot(t.W1.T())
+	a2 := t.sigmoid(z2).AddBias()
+	z3 := a2.Dot(t.W2.T())
+	a3 := t.sigmoid(z3)
+	return a3.ArgMax()
+}
 
-	gradW1 := NewZeros(t.W1.Rows, t.W1.Cols)
-	gradW2 := NewZeros(t.W2.Rows, t.W2.Cols)
+func (t *NeuralNet) Divide(xIn [][]float64, yIn [][]float64) (x, y, xPred, yPred [][]float64) {
+	predictionLength := int(math.Floor(float64(len(xIn)) / 2))
+	x = xIn[:len(xIn)-predictionLength]
+	y = yIn[:len(xIn)-predictionLength]
+	xPred = xIn[len(xIn)-predictionLength:]
+	yPred = yIn[len(xIn)-predictionLength:]
+	return x, y, xPred, yPred
+}
+
+func (t *NeuralNet) costFunction(x, y *Matrix, lambda float64) (J float64, gradW1 *Matrix, gradW2 *Matrix) {
+
+	gradW1 = NewZeros(t.W1.Rows, t.W1.Cols)
+	gradW2 = NewZeros(t.W2.Rows, t.W2.Cols)
 
 	// input
 	a1 := x.AddBias()
@@ -111,7 +136,7 @@ func (t *NeuralNet) costFunction(x, y *Matrix, lambda float64) (float64, *Matrix
 	Jreg2 := t.W2.RemoveBias().ElementSquare().Sum()
 
 	m := float64(x.Rows)
-	J := (J1.Sub(J2).Sum() / m) + (lambda * (Jreg1 + Jreg2) / (2 * m))
+	J = (J1.Sub(J2).Sum() / m) + (lambda * (Jreg1 + Jreg2) / (2 * m))
 
 	d3 := a3.Sub(y)
 	d2 := d3.Dot(t.W2.RemoveBias()).ElementMul(t.sigmoidPrime(z2))
@@ -130,17 +155,7 @@ func (t *NeuralNet) costFunction(x, y *Matrix, lambda float64) (float64, *Matrix
 	return J, gradW1, gradW2
 }
 
-func (t *NeuralNet) Predict(input []float64) []int {
-	xTe := NewMatrixF(input, 1, len(input))
-	a1 := xTe.AddBias()
-	z2 := a1.Dot(t.W1.T())
-	a2 := t.sigmoid(z2).AddBias()
-	z3 := a2.Dot(t.W2.T())
-	a3 := t.sigmoid(z3)
-	return a3.ArgMax()
-}
-
-func (t *NeuralNet) randomisedBatches(batchSize int, xAll [][]float64, yAll [][]float64) ([]*Matrix, []*Matrix) {
+func (t *NeuralNet) randomisedBatches(batchSize int, xAll [][]float64, yAll [][]float64) (X, Y []*Matrix) {
 	for i := range xAll {
 		j := rand.Intn(i + 1)
 		xAll[i], xAll[j] = xAll[j], xAll[i]
@@ -156,7 +171,6 @@ func (t *NeuralNet) randomisedBatches(batchSize int, xAll [][]float64, yAll [][]
 		yBatch[bIdx] = append(yBatch[bIdx], yAll[i])
 	}
 
-	var X []*Matrix
 	for i := range xBatch {
 		if len(xBatch[i]) == 0 {
 			continue
@@ -164,7 +178,6 @@ func (t *NeuralNet) randomisedBatches(batchSize int, xAll [][]float64, yAll [][]
 		X = append(X, NewMatrix(xBatch[i]))
 	}
 
-	var Y []*Matrix
 	for i := range yBatch {
 		if len(yBatch[i]) == 0 {
 			continue
@@ -204,37 +217,11 @@ func (t *NeuralNet) initPlots() {
 	t.costPlot.Cmd("set label 1 at graph 0.1, 0.95 tc default")
 	t.costPlot.SetXLabel("epoch")
 	t.costPlot.SetYLabel("cost")
-
-	var accPlot *gnuplot.Plotter
-
-	if accPlot, err = gnuplot.NewPlotter("", false, false); err != nil {
-		panic(fmt.Sprintf("** err: %v\n", err))
-	}
-	accPlot.SetStyle("lines")
-	accPlot.SetXLabel("epoch")
-	accPlot.SetYLabel("error %")
-	accPlot.Cmd("set yrange [0:110]")
-
-	t.accPlot = accPlot
+	t.costPlot.Cmd("set yrange [0:]")
 }
 
 func (t *NeuralNet) plotCost(trainingLoss, validationLoss []float64) {
 	t.costPlot.ResetPlot()
 	t.costPlot.PlotX(trainingLoss, "training")
 	t.costPlot.PlotX(validationLoss, "validation")
-
-	//t.accPlot.ResetPlot()
-	//t.accPlot.PlotX(acc, "test")
-	//t.accPlot.PlotX(pacc, "validation")
-}
-
-func (t *NeuralNet) Divide(xIn [][]float64, yIn [][]float64) ([][]float64, [][]float64, [][]float64, [][]float64) {
-
-	predictionLength := int(math.Floor(float64(len(xIn)) / 2))
-	x := xIn[:len(xIn)-predictionLength]
-	y := yIn[:len(xIn)-predictionLength]
-	xPred := xIn[len(xIn)-predictionLength:]
-	yPred := yIn[len(xIn)-predictionLength:]
-
-	return x, y, xPred, yPred
 }

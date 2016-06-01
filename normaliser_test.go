@@ -20,7 +20,7 @@ func TestTranspose(t *testing.T) {
 
 	norm := &Normaliser{}
 
-	actual := norm.transpose(input)
+	actual := norm.sliceTranspose(input)
 
 	if len(actual) != len(expected) {
 		t.Errorf("wanted input to be the same length as output, wanted %d, got %d", len(expected), len(actual))

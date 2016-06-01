@@ -8,15 +8,15 @@ type Normaliser struct {
 }
 
 func (n *Normaliser) StdDev(input [][]float64) [][]float64 {
-	br := n.transpose(input)
+	br := n.sliceTranspose(input)
 	var resultX [][]float64
 	for i := range br {
 		resultX = append(resultX, n.numeric(br[i]))
 	}
-	return n.transpose(resultX)
+	return n.sliceTranspose(resultX)
 }
 
-func (n *Normaliser) transpose(input [][]float64) [][]float64 {
+func (n *Normaliser) sliceTranspose(input [][]float64) [][]float64 {
 	b := make([][]float64, len(input[0]))
 	for i := 0; i < len(input[0]); i++ {
 		b[i] = make([]float64, len(input))
