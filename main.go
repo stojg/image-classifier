@@ -5,8 +5,8 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"time"
 	"runtime"
+	"time"
 )
 
 func main() {
@@ -44,7 +44,7 @@ func main() {
 	nn := &NeuralNet{
 		HiddenNeurons: 2000,
 		Alpha:         1e-3,
-		Lambda:        1e-3,
+		Lambda:        1e-2,
 		numBatches:    runtime.NumCPU(),
 		numEpochs:     1000,
 		log:           true,

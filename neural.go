@@ -6,8 +6,8 @@ import (
 	"log"
 	"math"
 	"math/rand"
-	"time"
 	"sync"
+	"time"
 )
 
 type NeuralNet struct {
@@ -44,9 +44,9 @@ func (t *NeuralNet) Train(xTr, yTr, xCv, yCv [][]float64) (float64, float64) {
 
 	// these are used so that we can update gnuplots with the data
 	var (
-		trainingCosts   []float64
+		trainingCosts    []float64
 		trainingEpochs   []float64
-		validationCosts []float64
+		validationCosts  []float64
 		validationEpochs []float64
 	)
 
@@ -241,7 +241,7 @@ func (t *NeuralNet) initPlots() {
 	title := fmt.Sprintf("set title \"Cost plot\"")
 	t.costPlot.Cmd(title)
 
-	t.costPlot.Cmd(fmt.Sprintf("set label 1 \"hidden neurons: %d\\nalpha: %f\\nlambda: %f\"", t.HiddenNeurons, t.Lambda, t.Alpha))
+	t.costPlot.Cmd(fmt.Sprintf("set label 1 \"hidden neurons: %d\\nalpha: %f\\nlambda: %f\"", t.HiddenNeurons, t.Alpha, t.Lambda))
 	t.costPlot.Cmd("set label 1 at graph 0.1, 0.95 tc default")
 	t.costPlot.SetXLabel("epoch")
 	t.costPlot.SetYLabel("cost")
