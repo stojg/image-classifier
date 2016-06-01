@@ -67,17 +67,15 @@ func main() {
 	Save("learned_net.json", nn)
 }
 
-func predict(nn *NeuralNet, trX, trY [][]float64) (int, float64) {
-	var correct int
-	for i := range trX {
-		result := nn.Predict(trX[i])
-		if trY[i][result[0]] > 0 {
+func predict(nn *NeuralNet, X, Y [][]float64) (correct int, percent float64) {
+	for i := range X {
+		result := nn.Predict(X[i])
+		if Y[i][result[0]] > 0 {
 			correct++
 		}
 	}
-	var percent float64
 	if correct != 0 {
-		percent = float64(correct) / float64(correct) * 100
+		percent = (float64(correct) / float64(len(X))) * 100
 	}
 	return correct, percent
 }
