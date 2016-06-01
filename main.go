@@ -44,8 +44,8 @@ func main() {
 		HiddenNeurons: 2000,
 		Alpha:         1e-3,
 		Lambda:        1e-3,
-		numBatches:    8,
-		numEpochs:     1000,
+		numBatches:    4,
+		numEpochs:     400,
 		log:           true,
 		plot:          true,
 	}
