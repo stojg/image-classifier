@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"time"
+	"sync"
 )
 
 type NeuralNet struct {
@@ -44,51 +45,80 @@ func (t *NeuralNet) Train(xTr, yTr, xCv, yCv [][]float64) (float64, float64) {
 	// these are used so that we can update gnuplots with the data
 	var (
 		trainingCosts   []float64
+		trainingEpochs   []float64
 		validationCosts []float64
+		validationEpochs []float64
 	)
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
+
+	var wg sync.WaitGroup
+
 	for epoch := 1; epoch < t.numEpochs+1; epoch++ {
 		xBatches, yBatches := t.randomisedBatches(t.numBatches, xTr, yTr)
 		dW1 := NewZeros(t.W1.Rows, t.W1.Cols)
 		dW2 := NewZeros(t.W2.Rows, t.W2.Cols)
 
+		aChan := make(chan *Matrix, len(xBatches))
+		bChan := make(chan *Matrix, len(xBatches))
+
 		for i := range xBatches {
-			_, a, b := t.costFunction(xBatches[i], yBatches[i], t.Lambda)
-			dW1 = dW1.Add(a)
-			dW2 = dW2.Add(b)
+			// calculate each batch in it's own go routine so we utilize as many CPU resources as possible
+			go func() {
+				wg.Add(1)
+				_, a, b := t.costFunction(xBatches[i], yBatches[i], t.Lambda)
+				aChan <- a
+				bChan <- b
+			}()
 		}
+
+		// drain the cost function results
+		go func() {
+			for range xBatches {
+				dW1 = dW1.Add(<-aChan)
+				dW2 = dW2.Add(<-bChan)
+				wg.Done()
+			}
+		}()
+
+		// wait for all calculated gradients
+		wg.Wait()
+
 		// parameter updates
 		t.W2 = t.W2.Sub(dW2.ScalarMul(t.Alpha))
 		t.W1 = t.W1.Sub(dW1.ScalarMul(t.Alpha))
 
-		// check the cost for the training set
-		jTrain, _, _ := t.costFunction(NewMatrix(xTr), NewMatrix(yTr), 0)
-		trainingCosts = append(trainingCosts, jTrain)
-
-		// check the cost for the validation set
-		jValidation, _, _ := t.costFunction(NewMatrix(xCv), NewMatrix(yCv), 0)
-		validationCosts = append(validationCosts, jValidation)
-
 		select {
 		case <-ticker.C:
+
+			jTrain, _, _ := t.costFunction(NewMatrix(xTr), NewMatrix(yTr), 0)
+			trainingCosts = append(trainingCosts, jTrain)
+			trainingEpochs = append(trainingEpochs, float64(epoch))
+
+			jValidation, _, _ := t.costFunction(NewMatrix(xCv), NewMatrix(yCv), 0)
+			validationCosts = append(validationCosts, jValidation)
+			validationEpochs = append(validationEpochs, float64(epoch))
+
 			if t.log {
 				log.Printf("epoch %d:\t%f\t%f", epoch, trainingCosts[len(trainingCosts)-1], validationCosts[len(validationCosts)-1])
 			}
 			if t.plot {
-				t.plotCost(trainingCosts, validationCosts)
+				t.plotCost(trainingCosts, trainingEpochs, validationCosts, validationEpochs)
 			}
 		default:
 		}
 	}
 
-	if t.plot {
-		t.plotCost(trainingCosts, validationCosts)
-	}
+	jTrain, _, _ := t.costFunction(NewMatrix(xTr), NewMatrix(yTr), 0)
+	trainingCosts = append(trainingCosts, jTrain)
 
-	if len(validationCosts) == 0 || len(trainingCosts) == 0 {
-		return math.Inf(-1), math.Inf(-1)
+	// check the cost for the validation set
+	jValidation, _, _ := t.costFunction(NewMatrix(xCv), NewMatrix(yCv), 0)
+	validationCosts = append(validationCosts, jValidation)
+
+	if len(validationCosts) != 0 && len(trainingCosts) != 0 && t.plot {
+		t.plotCost(trainingCosts, trainingEpochs, validationCosts, validationEpochs)
 	}
 	return trainingCosts[len(trainingCosts)-1], validationCosts[len(validationCosts)-1]
 }
@@ -218,8 +248,8 @@ func (t *NeuralNet) initPlots() {
 	t.costPlot.Cmd("set yrange [0:]")
 }
 
-func (t *NeuralNet) plotCost(trainingLoss, validationLoss []float64) {
+func (t *NeuralNet) plotCost(trainingCosts, trainingEpochs, validationCosts, validationEpochs []float64) {
 	t.costPlot.ResetPlot()
-	t.costPlot.PlotX(trainingLoss, "training")
-	t.costPlot.PlotX(validationLoss, "validation")
+	t.costPlot.PlotXY(trainingEpochs, trainingCosts, "training")
+	t.costPlot.PlotXY(validationEpochs, validationCosts, "validation")
 }

@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"time"
+	"runtime"
 )
 
 func main() {
@@ -44,8 +45,8 @@ func main() {
 		HiddenNeurons: 2000,
 		Alpha:         1e-3,
 		Lambda:        1e-3,
-		numBatches:    4,
-		numEpochs:     400,
+		numBatches:    runtime.NumCPU(),
+		numEpochs:     1000,
 		log:           true,
 		plot:          true,
 	}
